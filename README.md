@@ -219,7 +219,7 @@ TradeMaster provides many visualization toolkits for a systematic evaluation of 
 
 [Reinforcement learning with maskable stock representation for portfolio management in customizable stock pools](https://personal.ntu.edu.sg/boan/papers/WWW24_EarnMore.pdf) *(WWW 2024)*
 
-[EarnHFT: Efficient hierarchical reinforcement learning for high frequency trading](https://personal.ntu.edu.sg/boan/papers/AAAI24_EarnHFT.pdf) *(https://personal.ntu.edu.sg/boan/papers/AAAI24_EarnHFT.pdf)*
+[EarnHFT: Efficient hierarchical reinforcement learning for high frequency trading](https://personal.ntu.edu.sg/boan/papers/AAAI24_EarnHFT.pdf) *(AAAI 2024)*
 
 [Market-GAN: Adding control to financial market data generation with semantic context](https://personal.ntu.edu.sg/boan/papers/AAAI24_MarketGAN.pdf) *(AAAI 2024)*
 
