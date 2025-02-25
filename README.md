@@ -20,6 +20,7 @@ TradeMaster is a first-of-its kind, best-in-class __open-source platform__ for _
 
 | Update                                                                                                                                                                                                                                                     | Status                                                                                                                                                             |
 |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Add [EarnHFT](https://github.com/TradeMaster-NTU/EarnHFT), [Market-GAN](https://github.com/TradeMaster-NTU/Market-GAN) and [MacroHFT](https://github.com/ZONG0004/MacroHFT)                                                                                                                                              | :hammer: Updated on 25 Feb 2025    
 | Add [FinAgent](https://github.com/DVampire/FinAgent) and [EarnMore](https://github.com/DVampire/EarnMore)                                                                                                                                              | :hammer: Updated on 29 Oct 2024                                                                                                                                    |
 | Update [TradeMaster Website (Market Simualtor)](http://trademaster.cpolar.io/MarketGAN)                                                                                                                                                                    | :hammer: Updated on 21 Sep 2023                                                                                                                                    |
 | Update [TradeMaster Website (Market Dynamics Modeling Tool)](http://trademaster.cpolar.io/evaluation-toolbox)                                                                                                                                              | :wrench: Updated on 7 July 2023                                                                                                                                    |
@@ -35,11 +36,13 @@ TradeMaster is a first-of-its kind, best-in-class __open-source platform__ for _
 ## Outline
 
 - [TradeMaster: An RL Platform for Trading](#trademaster-an-rl-platform-for-trading)
+  - [:star: **What's NEW!**   :alarm\_clock:](#star-whats-new---alarm_clock)
   - [Outline](#outline)
   - [Overview](#overview)
   - [Installation](#installation)
   - [Tutorial](#tutorial)
   - [Useful Script](#useful-script)
+  - [TradeMaster Sandbox](#trademaster-sandbox)
   - [Dataset](#dataset)
   - [Model Zoo](#model-zoo)
   - [Visualization Toolkit](#visualization-toolkit)
@@ -210,6 +213,20 @@ TradeMaster provides many visualization toolkits for a systematic evaluation of 
 ```
 
 ## Publications
+[A multimodal foundation agent for financial trading: Tool-augmented, diversified, and generalist](https://personal.ntu.edu.sg/boan/papers/KDD24_FinAgent.pdf) *(KDD 2024)*
+
+[MacroHFT: Memory augmented context-aware reinforcement learning on high frequency trading](https://personal.ntu.edu.sg/boan/papers/KDD24_MacroHFT.pdf) *(KDD 2024)*
+
+[Reinforcement learning with maskable stock representation for portfolio management in customizable stock pools](https://personal.ntu.edu.sg/boan/papers/WWW24_EarnMore.pdf) *(WWW 2024)*
+
+[EarnHFT: Efficient hierarchical reinforcement learning for high frequency trading](https://personal.ntu.edu.sg/boan/papers/AAAI24_EarnHFT.pdf) *(https://personal.ntu.edu.sg/boan/papers/AAAI24_EarnHFT.pdf)*
+
+[Market-GAN: Adding control to financial market data generation with semantic context](https://personal.ntu.edu.sg/boan/papers/AAAI24_MarketGAN.pdf) *(AAAI 2024)*
+
+[TradeMaster: A holistic quantitative trading platform empowered by reinforcement learning](https://personal.ntu.edu.sg/boan/papers/NeurIPS_23_TradeMaster.pdf)  *(NeurIPS 2023)*
+
+[Mastering stock markets with efficient mixture of diversified trading experts](https://personal.ntu.edu.sg/boan/papers/KDD23_Stock.pdf) *(KDD 2023)*
+
 [PRUDEX-Compass: Towards Systematic Evaluation of Reinforcement Learning in Financial Markets](https://openreview.net/forum?id=JjbsIYOuNi) *(Transactions on Machine learning Research 2023)*
 
 [Reinforcement Learning for Quantitative Trading (Survey)](https://dl.acm.org/doi/10.1145/3582560) *(ACM Transactions on Intelligent Systems and Technology 2023)*
