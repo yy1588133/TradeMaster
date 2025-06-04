@@ -16,6 +16,8 @@
 ***
 TradeMaster is a first-of-its kind, best-in-class __open-source platform__ for __quantitative trading (QT)__ empowered by __reinforcement learning (RL)__, which covers the __full pipeline__ for the design, implementation, evaluation and deployment of RL-based algorithms.
 
+<span style="color:blue">Hiring: multiple fully-funded PhD and RA positions are available under the supervision of Dr. [Sun Shuo](https://sunshuo01.github.io/) (first author of TradeMaster paper) at HKUST(GZ).</span>
+
 ## :star: **What's NEW!**   :alarm_clock: 
 
 | Update                                                                                                                                                                                                                                                     | Status                                                                                                                                                             |
