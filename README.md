@@ -65,9 +65,108 @@ __TradeMaster__ is composed of 6 key modules: 1) multi-modality market data of d
 
 
 ## Installation
-Here are the installation tutorials for different operating systems and docker:
+
+### 🐳 Docker Deployment (Recommended)
+
+The fastest and most reliable way to get TradeMaster running is through our Docker containerization solution.
+
+#### 🚀 Quick Start with Docker
+
+**For Windows Users:**
+```bash
+# 1. Clone the repository
+git clone https://github.com/TradeMaster-NTU/TradeMaster.git
+cd TradeMaster
+
+# 2. Build the Docker image
+docker build -t trademaster:latest .
+
+# 3. Start the container
+start-container.bat
+```
+
+**For Linux/macOS Users:**
+```bash
+# 1. Clone the repository
+git clone https://github.com/TradeMaster-NTU/TradeMaster.git
+cd TradeMaster
+
+# 2. Build the Docker image
+docker build -t trademaster:latest .
+
+# 3. Start the container
+docker run -d \
+  --name trademaster-container \
+  -p 8080:8080 -p 8888:8888 -p 5001:5000 \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd):/workspace" \
+  --restart unless-stopped \
+  trademaster:latest tail -f /dev/null
+
+# 4. Enter the container
+docker exec -it trademaster-container bash
+```
+
+#### ✨ Docker Features
+
+- **🔄 One-Click Deployment**: Automated container setup with all dependencies
+- **📦 Environment Isolation**: Clean Python 3.8 environment with virtual environment
+- **💾 Data Persistence**: Automatic data volume mounting for safe data storage
+- **🌐 Multi-Service Access**: Web interface (8080), Jupyter (8888), API (5001)
+- **🛡️ Auto-Recovery**: Container restart policies for high availability
+
+#### 📚 Docker Documentation
+
+| Document | Description | Link |
+|----------|-------------|------|
+| **Complete Deployment Guide** | Comprehensive Docker setup and configuration | [📖 docs/DOCKER_DEPLOYMENT_GUIDE.md](docs/DOCKER_DEPLOYMENT_GUIDE.md) |
+| **Quick Start Guide** | Role-based quick start for different users | [🚀 docs/QUICK_START_GUIDE.md](docs/QUICK_START_GUIDE.md) |
+| **Troubleshooting Guide** | System diagnosis and problem resolution | [🔧 docs/TROUBLESHOOTING_GUIDE.md](docs/TROUBLESHOOTING_GUIDE.md) |
+| **Container Management** | Management scripts and best practices | [🛠️ Available Scripts](#docker-management-scripts) |
+
+#### 🛠️ Docker Management Scripts
+
+The project includes convenient management scripts for Windows users:
+
+- **`manage-container.bat`** - Interactive management interface
+- **`start-container.bat`** - Start TradeMaster container
+- **`stop-container.bat`** - Stop and remove container
+- **`enter-container.bat`** - Enter container shell
+
+#### ⚙️ System Requirements
+
+**Minimum Requirements:**
+- Docker Desktop 4.0+
+- 8GB RAM, 15GB disk space
+- Windows 10/11, macOS 10.14+, or Linux
+
+**Recommended:**
+- 16GB+ RAM, 50GB+ SSD
+- Multi-core CPU for better performance
+
+#### 🔍 Verify Installation
+
+After container startup, verify the installation:
+
+```bash
+# Check container status
+docker ps | grep trademaster-container
+
+# Test TradeMaster import
+docker exec trademaster-container python3 -c "import trademaster; print('✅ Success!')"
+
+# Access services
+# Web Interface: http://localhost:8080
+# Jupyter Notebook: http://localhost:8888
+# API Service: http://localhost:5001
+```
+
+### 🔧 Traditional Installation
+
+For users who prefer traditional installation methods:
+
 - [Installation on Linux/Windows/MacOS](https://github.com/TradeMaster-NTU/TradeMaster/tree/1.0.0/installation/requirements.md)
-- [Installation with Docker](https://github.com/TradeMaster-NTU/TradeMaster/tree/1.0.0/installation/docker.md)
+- [Manual Docker Setup](https://github.com/TradeMaster-NTU/TradeMaster/tree/1.0.0/installation/docker.md)
 
 ## Tutorial
 We provide tutorials covering core features of TradeMaster for users to get start with.

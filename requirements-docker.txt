@@ -1,0 +1,35 @@
+Flask
+Flask-Cors
+# mmcv==1.7.1  # 跳过这个包，因为它可能有复杂的依赖
+# git+https://github.com/optuna/optuna.git  # 跳过git安装，使用稳定版本
+optuna
+prettytable
+plotly
+psutil
+scipy==1.9.3
+# spacy  # 跳过spacy，因为它有复杂的依赖问题
+sqlalchemy
+pandas
+iopath
+yfinance
+matplotlib
+statsmodels
+scikit_learn
+tslearn
+gym
+gymnasium
+ray[rllib]==1.13.0
+tensorflow==2.11.0
+packaging
+kaleido==0.1.0
+h5py
+pydantic==1.10.2
+jupyter
+celery
+pika
+fvcore
+# openfe  # 可能有依赖问题，先跳过
+fastdtw
+chardet
+pyarrow
+numpy==1.21.6

@@ -1496,6 +1496,6 @@ def health_check():
 
 
 if __name__ == "__main__":
-    host = "127.0.0.1"
+    host = "0.0.0.0"  # 绑定到所有接口，允许外部访问
     port = 8080
-    app.run(host, port)
+    app.run(host, port, debug=False)

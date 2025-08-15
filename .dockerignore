@@ -1,0 +1,92 @@
+# Git files
+.git
+.gitignore
+*.git*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment files
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+*.rst
+# *.txt  # 注释掉这行，允许requirements文件
+!requirements.txt
+!requirements-docker.txt
+
+# Testing
+unit_testing/
+test_*.py
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Docker files (avoid recursive copying)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Large data files that might not be needed during build
+figure/
+tutorial/
+
+# Deployment files
+deploy/
+
+# Local configuration
+tea.yaml
+setup.cfg
+
+# Any backup files
+*.bak
+*.backup
