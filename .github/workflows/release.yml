@@ -1,0 +1,440 @@
+# ==================== TradeMaster Web Interface 发布工作流 ====================
+# 自动化版本发布和部署工作流
+
+name: Release
+
+on:
+  # 当推送标签时触发
+  push:
+    tags:
+      - 'v*.*.*'
+  
+  # 手动触发发布
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - 'release'
+          - 'prerelease'
+          - 'draft'
+      deploy_production:
+        description: 'Deploy to production'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+  PNPM_VERSION: '8'
+
+jobs:
+  # ==================== 版本验证 ====================
+  validate:
+    name: 🔍 Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.release_type == 'prerelease' }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            if [[ $VERSION == *"alpha"* ]] || [[ $VERSION == *"beta"* ]] || [[ $VERSION == *"rc"* ]]; then
+              IS_PRERELEASE=true
+            else
+              IS_PRERELEASE=false
+            fi
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+          echo "Is prerelease: $IS_PRERELEASE"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-](alpha|beta|rc)[0-9]*)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: X.Y.Z or X.Y.Z-alpha.N, X.Y.Z-beta.N, X.Y.Z-rc.N"
+            exit 1
+          fi
+          echo "✅ Version format is valid: $VERSION"
+
+  # ==================== 运行完整测试套件 ====================
+  test:
+    name: 🧪 Full Test Suite
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      skip_deploy: true
+    secrets: inherit
+
+  # ==================== 构建发布版本 ====================
+  build:
+    name: 🔨 Build Release
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # 构建前端
+      - name: Build frontend
+        working-directory: web_interface/frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          
+      # 构建后端
+      - name: Build backend
+        working-directory: web_interface/backend
+        run: |
+          pip install build
+          python -m build
+
+      # 创建发布包
+      - name: Create release archive
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # 创建发布目录
+          mkdir -p release/trademaster-web-$VERSION
+          
+          # 复制构建产物
+          cp -r web_interface/frontend/dist release/trademaster-web-$VERSION/frontend
+          cp -r web_interface/backend/dist release/trademaster-web-$VERSION/backend
+          cp -r web_interface/docker release/trademaster-web-$VERSION/
+          
+          # 复制配置文件
+          cp web_interface/docker-compose.prod.yml release/trademaster-web-$VERSION/
+          cp web_interface/.env.prod.template release/trademaster-web-$VERSION/
+          cp README.md release/trademaster-web-$VERSION/
+          cp LICENSE release/trademaster-web-$VERSION/
+          
+          # 创建安装脚本
+          cat > release/trademaster-web-$VERSION/install.sh << 'EOF'
+          #!/bin/bash
+          echo "🚀 Installing TradeMaster Web Interface $VERSION"
+          
+          # 检查 Docker 和 Docker Compose
+          if ! command -v docker &> /dev/null; then
+              echo "❌ Docker is not installed"
+              exit 1
+          fi
+          
+          if ! command -v docker-compose &> /dev/null; then
+              echo "❌ Docker Compose is not installed"
+              exit 1
+          fi
+          
+          # 设置环境变量
+          if [ ! -f .env.prod ]; then
+              cp .env.prod.template .env.prod
+              echo "📝 Created .env.prod from template"
+              echo "⚠️  Please edit .env.prod with your configuration"
+          fi
+          
+          # 启动服务
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          echo "✅ Installation completed!"
+          echo "📖 Access the application at http://localhost"
+          EOF
+          
+          chmod +x release/trademaster-web-$VERSION/install.sh
+          
+          # 创建压缩包
+          cd release
+          tar -czf trademaster-web-$VERSION.tar.gz trademaster-web-$VERSION/
+          zip -r trademaster-web-$VERSION.zip trademaster-web-$VERSION/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-${{ needs.validate.outputs.version }}
+          path: |
+            release/trademaster-web-${{ needs.validate.outputs.version }}.tar.gz
+            release/trademaster-web-${{ needs.validate.outputs.version }}.zip
+
+  # ==================== 构建 Docker 镜像 ====================
+  docker:
+    name: 🐳 Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            trademaster/web-interface
+            ghcr.io/${{ github.repository }}/web-interface
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.version }},enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: web_interface
+          file: web_interface/docker-compose.prod.yml
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+  # ==================== 创建 GitHub Release ====================
+  release:
+    name: 📦 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, docker]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-${{ needs.validate.outputs.version }}
+          path: ./release
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # 获取上一个标签
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since $PREV_TAG" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            
+            # 生成提交日志
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" --no-merges >> CHANGELOG.md
+          else
+            echo "## Initial Release" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "🎉 First release of TradeMaster Web Interface!" >> CHANGELOG.md
+          fi
+          
+          echo "" >> CHANGELOG.md
+          echo "## Docker Images" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "- \`trademaster/web-interface:$VERSION\`" >> CHANGELOG.md
+          echo "- \`ghcr.io/${{ github.repository }}/web-interface:$VERSION\`" >> CHANGELOG.md
+          
+          # 输出到环境变量
+          {
+            echo 'CHANGELOG<<EOF'
+            cat CHANGELOG.md
+            echo EOF
+          } >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: Release v${{ needs.validate.outputs.version }}
+          body: ${{ env.CHANGELOG }}
+          draft: ${{ github.event.inputs.release_type == 'draft' }}
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          files: |
+            release/trademaster-web-${{ needs.validate.outputs.version }}.tar.gz
+            release/trademaster-web-${{ needs.validate.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== 部署到生产环境 ====================
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, release]
+    if: |
+      !needs.validate.outputs.is_prerelease && 
+      (github.event.inputs.deploy_production == 'true' || github.event.inputs.deploy_production == '')
+    environment:
+      name: production
+      url: https://your-domain.com
+
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying version ${{ needs.validate.outputs.version }} to production..."
+          # 这里添加实际的生产部署脚本
+          
+      - name: Health check
+        run: |
+          echo "🏥 Performing health check..."
+          # 健康检查脚本
+          sleep 30
+          curl -f https://your-domain.com/health || exit 1
+
+      - name: Update deployment status
+        run: |
+          echo "✅ Production deployment completed successfully!"
+
+  # ==================== 发布通知 ====================
+  notify:
+    name: 📬 Send Notifications
+    runs-on: ubuntu-latest
+    needs: [validate, release, deploy-production]
+    if: always()
+
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            📦 New release published!
+            Version: v${{ needs.validate.outputs.version }}
+            Status: ${{ job.status }}
+            
+            🐳 Docker Images:
+            - trademaster/web-interface:${{ needs.validate.outputs.version }}
+            - ghcr.io/${{ github.repository }}/web-interface:${{ needs.validate.outputs.version }}
+            
+            📥 Download: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }}
+
+      - name: Send email notification
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "TradeMaster Web Interface v${{ needs.validate.outputs.version }} Released"
+          body: |
+            A new version of TradeMaster Web Interface has been released!
+            
+            Version: v${{ needs.validate.outputs.version }}
+            Release Notes: https://github.com/${{ github.repository }}/releases/tag/v${{ needs.validate.outputs.version }}
+            
+            Docker Images:
+            - trademaster/web-interface:${{ needs.validate.outputs.version }}
+            - ghcr.io/${{ github.repository }}/web-interface:${{ needs.validate.outputs.version }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: TradeMaster Release Bot <noreply@trademaster.ai>
+
+  # ==================== 更新文档 ====================
+  update-docs:
+    name: 📚 Update Documentation
+    runs-on: ubuntu-latest
+    needs: [validate, release]
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in docs
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # 更新 README 中的版本号
+          sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+/version-$VERSION/g" README.md
+          
+          # 更新 package.json 版本
+          cd web_interface/frontend
+          npm version $VERSION --no-git-tag-version
+          
+          cd ../backend
+          # 更新 pyproject.toml 版本
+          sed -i "s/version = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/version = \"$VERSION\"/g" ../../pyproject.toml
+
+      - name: Commit version updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "🔖 Update version to ${{ needs.validate.outputs.version }}"
+          git push
+
+# ==================== 使用说明 ====================
+# 
+# 触发发布的方式:
+# 1. 推送标签: git tag v1.0.0 && git push origin v1.0.0
+# 2. 手动触发: 在 GitHub Actions 页面手动运行
+# 
+# 版本格式:
+# - 正式版本: 1.0.0, 2.1.3
+# - 预发布版本: 1.0.0-alpha.1, 1.0.0-beta.2, 1.0.0-rc.1
+# 
+# 发布产物:
+# - GitHub Release with source code and binaries
+# - Docker images on Docker Hub and GitHub Container Registry
+# - 自动生成的 CHANGELOG
+# - 生产环境部署 (可选)

@@ -1,0 +1,194 @@
+{
+  "// ==================== TradeMaster Web Interface VS Code 调试配置 ====================": "",
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "// ==================== Python 后端调试 ====================": "",
+      "name": "🐍 Debug Backend (FastAPI)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/web_interface/backend/app/main.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/web_interface/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/web_interface/backend",
+        "DEBUG": "true",
+        "LOG_LEVEL": "DEBUG",
+        "DATABASE_URL": "postgresql://trademaster:dev_password_123@localhost:5432/trademaster_web",
+        "REDIS_URL": "redis://localhost:6379/0",
+        "SECRET_KEY": "dev-secret-key-for-debugging-only"
+      },
+      "args": [],
+      "justMyCode": false,
+      "stopOnEntry": false,
+      "autoReload": {
+        "enable": true
+      },
+      "django": false,
+      "flask": false,
+      "gevent": false,
+      "pyramid": false
+    },
+    {
+      "name": "🐍 Debug Backend (Uvicorn)",
+      "type": "debugpy", 
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--log-level",
+        "debug"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/web_interface/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/web_interface/backend",
+        "DEBUG": "true",
+        "LOG_LEVEL": "DEBUG"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "🧪 Debug Backend Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--tb=short"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/web_interface/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/web_interface/backend",
+        "TESTING": "1",
+        "DATABASE_URL": "postgresql://trademaster:dev_password_123@localhost:5432/trademaster_test",
+        "REDIS_URL": "redis://localhost:6379/1",
+        "SECRET_KEY": "test-secret-key"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "🔧 Debug Backend Script",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/web_interface/backend",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/web_interface/backend"
+      },
+      "justMyCode": false
+    },
+    {
+      "// ==================== Node.js 前端调试 ====================": "",
+      "name": "🌐 Debug Frontend (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/web_interface/frontend/src",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ],
+      "smartStep": true,
+      "sourceMaps": true,
+      "trace": "verbose",
+      "userDataDir": false,
+      "runtimeExecutable": "",
+      "runtimeArgs": [
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor",
+        "--remote-debugging-port=9222"
+      ]
+    },
+    {
+      "name": "🌐 Debug Frontend (Edge)",
+      "type": "msedge",
+      "request": "launch", 
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/web_interface/frontend/src",
+      "skipFiles": [
+        "<node_internals>/**",
+        "**/node_modules/**"
+      ],
+      "smartStep": true,
+      "sourceMaps": true
+    },
+    {
+      "name": "🔧 Debug Vite Config",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/web_interface/frontend/node_modules/.bin/vite",
+      "args": [
+        "--config",
+        "vite.config.ts",
+        "--debug"
+      ],
+      "cwd": "${workspaceFolder}/web_interface/frontend",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "NODE_ENV": "development",
+        "DEBUG": "*"
+      }
+    },
+    {
+      "// ==================== 集成调试配置 ====================": "",
+      "name": "🚀 Debug Full Stack",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/debug-full-stack.js",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "DEBUG": "1"
+      }
+    },
+    {
+      "// ==================== 容器调试 ====================": "",
+      "name": "🐳 Attach to Backend Container",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": {
+        "host": "localhost",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/web_interface/backend",
+          "remoteRoot": "/app"
+        }
+      ],
+      "justMyCode": false
+    }
+  ],
+  
+  "// ==================== 复合启动配置 ====================": "",
+  "compounds": [
+    {
+      "name": "🚀 Launch Full Stack",
+      "configurations": [
+        "🐍 Debug Backend (FastAPI)",
+        "🌐 Debug Frontend (Chrome)"
+      ],
+      "stopAll": true,
+      "preLaunchTask": "${workspaceFolder}/.vscode/tasks.json#start-services"
+    },
+    {
+      "name": "🧪 Debug Full Stack Tests",
+      "configurations": [
+        "🧪 Debug Backend Tests",
+        "🌐 Debug Frontend (Chrome)"
+      ],
+      "stopAll": true
+    }
+  ]
+}

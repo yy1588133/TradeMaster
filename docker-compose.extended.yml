@@ -1,0 +1,423 @@
+# ==================== TradeMaster 完整生态系统配置 ====================
+# 该配置文件扩展现有TradeMaster Docker配置，添加Web界面支持
+# 使用方法: docker-compose -f docker-compose.yml -f docker-compose.extended.yml up -d
+
+version: '3.8'
+
+services:
+  # ==================== 现有TradeMaster服务 ====================
+  # 注意：这里假设已有一个基础的docker-compose.yml文件定义了trademaster服务
+  # 如果没有，需要先创建基础的TradeMaster容器配置
+  
+  trademaster:
+    # 如果已有trademaster服务，这里可以扩展其配置
+    # 否则需要创建完整的服务定义
+    image: trademaster:latest
+    container_name: trademaster-core
+    hostname: trademaster-core
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/home/TradeMaster
+      - TZ=Asia/Shanghai
+    ports:
+      - "${TRADEMASTER_PORT:-8080}:8080"
+    volumes:
+      - ./data:/home/TradeMaster/data:rw
+      - ./configs:/home/TradeMaster/configs:rw
+      - ./tools:/home/TradeMaster/tools:rw
+      - trademaster_workspace:/workspace
+    networks:
+      - trademaster-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health", "||", "exit", "1"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  # ==================== Web界面数据库服务 ====================
+  web-postgres:
+    image: postgres:15-alpine
+    container_name: trademaster-web-postgres
+    hostname: web-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WEB_POSTGRES_DB:-trademaster_web}
+      POSTGRES_USER: ${WEB_POSTGRES_USER:-trademaster}
+      POSTGRES_PASSWORD: ${WEB_POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+      TZ: Asia/Shanghai
+    volumes:
+      - web_postgres_data:/var/lib/postgresql/data
+      - web_postgres_backups:/backups
+      - ./web_interface/docker/postgres/init-integrated.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WEB_POSTGRES_USER:-trademaster} -d ${WEB_POSTGRES_DB:-trademaster_web}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - trademaster-network
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==================== Web界面Redis缓存 ====================
+  web-redis:
+    image: redis:7-alpine
+    container_name: trademaster-web-redis
+    hostname: web-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - web_redis_data:/data
+      - ./web_interface/docker/redis/redis-integrated.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - trademaster-network
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # ==================== Web界面后端服务 ====================
+  web-backend:
+    build:
+      context: ./web_interface
+      dockerfile: docker/backend/Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
+    image: trademaster-web-backend:${VERSION:-latest}
+    container_name: trademaster-web-backend
+    hostname: web-backend
+    restart: unless-stopped
+    environment:
+      # 应用配置
+      PROJECT_NAME: "TradeMaster Web Interface"
+      VERSION: ${VERSION:-1.0.0}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # 服务器配置
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8000"
+      
+      # 数据库配置
+      DATABASE_URL: "postgresql://${WEB_POSTGRES_USER:-trademaster}:${WEB_POSTGRES_PASSWORD}@web-postgres:5432/${WEB_POSTGRES_DB:-trademaster_web}"
+      
+      # Redis配置
+      REDIS_URL: "redis://web-redis:6379/0"
+      
+      # 安全配置
+      SECRET_KEY: ${WEB_SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # CORS配置
+      BACKEND_CORS_ORIGINS: ${WEB_CORS_ORIGINS:-"http://localhost:3000,http://localhost:80"}
+      
+      # TradeMaster集成配置
+      TRADEMASTER_API_URL: "http://trademaster-core:8080"
+      TRADEMASTER_DATA_PATH: "/app/trademaster_data"
+      
+      # 时区
+      TZ: Asia/Shanghai
+    volumes:
+      # 数据目录
+      - web_backend_data:/app/data
+      - web_backend_logs:/app/logs
+      - web_backend_uploads:/app/uploads
+      
+      # 与TradeMaster核心共享数据
+      - ./data:/app/trademaster_data:ro
+      - ./configs:/app/trademaster_configs:ro
+      - trademaster_workspace:/app/trademaster_workspace:ro
+    depends_on:
+      web-postgres:
+        condition: service_healthy
+      web-redis:
+        condition: service_healthy
+      trademaster:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/health-check.sh", "quick"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    networks:
+      - trademaster-network
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  # ==================== Web界面前端服务 ====================
+  web-frontend:
+    build:
+      context: ./web_interface
+      dockerfile: docker/frontend/Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL:-http://localhost/api/v1}
+        REACT_APP_WS_URL: ${REACT_APP_WS_URL:-ws://localhost/ws}
+    image: trademaster-web-frontend:${VERSION:-latest}
+    container_name: trademaster-web-frontend
+    hostname: web-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_HOST: web-backend
+      BACKEND_PORT: 8000
+      TZ: Asia/Shanghai
+    volumes:
+      - web_frontend_logs:/var/log/nginx
+    depends_on:
+      - web-backend
+    healthcheck:
+      test: ["CMD", "/health-check.sh", "quick"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    networks:
+      - trademaster-network
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ==================== 统一网关服务 ====================
+  gateway:
+    image: nginx:alpine
+    container_name: trademaster-gateway
+    hostname: gateway
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${GATEWAY_HTTP_PORT:-80}:80"
+      - "${GATEWAY_HTTPS_PORT:-443}:443"
+      - "${TRADEMASTER_API_PORT:-8080}:8080"  # TradeMaster API代理
+    volumes:
+      # Nginx配置
+      - ./web_interface/docker/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web_interface/docker/nginx/nginx-gateway.conf:/etc/nginx/nginx.conf:ro
+      
+      # SSL证书（如果有）
+      - ./web_interface/docker/nginx/ssl:/etc/nginx/ssl:ro
+      
+      # 静态文件和错误页面
+      - ./web_interface/docker/nginx/html:/usr/share/nginx/html:ro
+      
+      # 日志
+      - gateway_logs:/var/log/nginx
+    depends_on:
+      - web-frontend
+      - trademaster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    networks:
+      - trademaster-network
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+
+  # ==================== 监控服务（可选）====================
+  # 系统监控
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: trademaster-node-exporter
+    hostname: node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    networks:
+      - trademaster-network
+    profiles:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # 容器监控
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: trademaster-cadvisor
+    hostname: cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - trademaster-network
+    profiles:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+# ==================== 网络配置 ====================
+networks:
+  trademaster-network:
+    name: trademaster-integrated-network
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: tm-integrated
+      com.docker.network.driver.mtu: "1500"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+# ==================== 数据卷配置 ====================
+volumes:
+  # TradeMaster工作空间
+  trademaster_workspace:
+    name: trademaster-workspace
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TRADEMASTER_WORKSPACE:-${PWD}/workspace}
+
+  # Web界面PostgreSQL数据
+  web_postgres_data:
+    name: trademaster-web-postgres-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_postgres_data
+
+  # Web界面PostgreSQL备份
+  web_postgres_backups:
+    name: trademaster-web-postgres-backups
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_postgres_backups
+
+  # Web界面Redis数据
+  web_redis_data:
+    name: trademaster-web-redis-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_redis_data
+
+  # Web后端数据
+  web_backend_data:
+    name: trademaster-web-backend-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_backend_data
+
+  # Web后端日志
+  web_backend_logs:
+    name: trademaster-web-backend-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_backend_logs
+
+  # Web后端上传文件
+  web_backend_uploads:
+    name: trademaster-web-backend-uploads
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_backend_uploads
+
+  # Web前端日志
+  web_frontend_logs:
+    name: trademaster-web-frontend-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/web_frontend_logs
+
+  # 网关日志
+  gateway_logs:
+    name: trademaster-gateway-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-${PWD}/docker/volumes}/gateway_logs

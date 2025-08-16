@@ -1,0 +1,537 @@
+{
+  "// ==================== TradeMaster Web Interface VS Code 任务配置 ====================": "",
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "// ==================== 开发服务任务 ====================": "",
+      "label": "🚀 Start All Services",
+      "type": "shell",
+      "command": "make",
+      "args": ["dev"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "🐍 Start Backend Only",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/dev.py"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": ["relative", "${workspaceFolder}/web_interface/backend"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|info):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "🌐 Start Frontend Only", 
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["dev"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "problemMatcher": {
+        "owner": "typescript",
+        "applyTo": "closedDocuments",
+        "fileLocation": ["relative", "${workspaceFolder}/web_interface/frontend"],
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+),(\\d+)\\):\\s+(error|warning|info)\\s+(TS\\d+):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    },
+    {
+      "// ==================== 构建任务 ====================": "",
+      "label": "🔨 Build All",
+      "type": "shell",
+      "command": "make", 
+      "args": ["build"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$tsc", "$eslint-stylish"]
+    },
+    {
+      "label": "🔨 Build Frontend",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["build"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "problemMatcher": ["$tsc", "$eslint-stylish"]
+    },
+    {
+      "label": "🔨 Build Backend",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "build"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": {
+        "owner": "python",
+        "fileLocation": "relative",
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "// ==================== 测试任务 ====================": "",
+      "label": "🧪 Run All Tests",
+      "type": "shell",
+      "command": "make",
+      "args": ["test"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$pytest", "$eslint-stylish"]
+    },
+    {
+      "label": "🧪 Run Backend Tests",
+      "type": "shell",
+      "command": "pytest",
+      "args": [
+        "tests/",
+        "-v",
+        "--cov=app",
+        "--cov-report=html",
+        "--cov-report=term-missing"
+      ],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": {
+        "owner": "pytest",
+        "fileLocation": ["relative", "${workspaceFolder}/web_interface/backend"],
+        "pattern": [
+          {
+            "regexp": "^(.*):(\\d+): (FAILED|ERROR)(.*)$",
+            "file": 1,
+            "line": 2,
+            "severity": 3,
+            "message": 4
+          }
+        ]
+      }
+    },
+    {
+      "label": "🧪 Run Frontend Tests",
+      "type": "shell", 
+      "command": "pnpm",
+      "args": ["test"],
+      "group": "test",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "problemMatcher": {
+        "owner": "vitest",
+        "fileLocation": ["relative", "${workspaceFolder}/web_interface/frontend"],
+        "pattern": {
+          "regexp": "^\\s*(.*)\\s+(.*):(\\d+):(\\d+)$",
+          "file": 2,
+          "line": 3,
+          "column": 4,
+          "message": 1
+        }
+      }
+    },
+    {
+      "// ==================== 代码质量任务 ====================": "",
+      "label": "🔍 Lint All",
+      "type": "shell",
+      "command": "make",
+      "args": ["lint"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$eslint-stylish", "$mypy", "$flake8"]
+    },
+    {
+      "label": "✨ Format All",
+      "type": "shell",
+      "command": "make", 
+      "args": ["format"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🔍 Lint Backend",
+      "type": "shell",
+      "command": "make",
+      "args": ["lint"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": ["$mypy", "$flake8"]
+    },
+    {
+      "label": "🔍 Lint Frontend",
+      "type": "shell",
+      "command": "pnpm", 
+      "args": ["lint"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "problemMatcher": "$eslint-stylish"
+    },
+    {
+      "// ==================== 数据库任务 ====================": "",
+      "label": "🗄️ Database Migration",
+      "type": "shell",
+      "command": "alembic",
+      "args": ["upgrade", "head"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🗄️ Create Migration",
+      "type": "shell",
+      "command": "alembic",
+      "args": [
+        "revision",
+        "--autogenerate",
+        "-m",
+        "${input:migrationMessage}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "// ==================== Docker 任务 ====================": "",
+      "label": "🐳 Start Docker Services",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["-f", "docker-compose.dev.yml", "up", "-d"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "🐳 Stop Docker Services",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": ["-f", "docker-compose.dev.yml", "down"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface"
+      },
+      "problemMatcher": []
+    },
+    {
+      "// ==================== 清理任务 ====================": "",
+      "label": "🧹 Clean All",
+      "type": "shell",
+      "command": "make",
+      "args": ["clean"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "// ==================== 安装任务 ====================": "",
+      "label": "📦 Install Dependencies",
+      "type": "shell",
+      "command": "make",
+      "args": ["setup"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "clear": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "// ==================== 类型检查任务 ====================": "",
+      "label": "📝 Type Check",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["type-check"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "// ==================== 监控任务 ====================": "",
+      "label": "📊 Watch Backend",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/dev.py", "--debug"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/backend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "python",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Starting development server.*$",
+          "endsPattern": "^.*Application startup complete.*$"
+        },
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|info):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "📊 Watch Frontend",
+      "type": "shell", 
+      "command": "pnpm",
+      "args": ["dev"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "dedicated",
+        "showReuseMessage": false
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/web_interface/frontend"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Local:.*$",
+          "endsPattern": "^.*ready in.*$"
+        },
+        "pattern": {
+          "regexp": "^(.+)\\((\\d+),(\\d+)\\):\\s+(error|warning|info)\\s+(TS\\d+)?:?\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "code": 5,
+          "message": 6
+        }
+      }
+    }
+  ],
+  
+  "// ==================== 输入定义 ====================": "",
+  "inputs": [
+    {
+      "id": "migrationMessage",
+      "type": "promptString",
+      "description": "Enter migration message"
+    },
+    {
+      "id": "testFile",
+      "type": "promptString", 
+      "description": "Enter test file path"
+    },
+    {
+      "id": "dockerService",
+      "type": "pickString",
+      "description": "Select Docker service",
+      "options": [
+        "postgres",
+        "redis",
+        "backend", 
+        "frontend",
+        "nginx"
+      ]
+    }
+  ]
+}

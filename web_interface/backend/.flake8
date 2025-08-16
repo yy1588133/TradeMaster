@@ -1,0 +1,246 @@
+# ==================== TradeMaster Backend Flake8 配置 ====================
+# Flake8 Python 代码风格检查配置文件
+
+[flake8]
+# 最大行长度，与 black 保持一致
+max-line-length = 88
+
+# 最大复杂度
+max-complexity = 10
+
+# 忽略的错误代码
+ignore = 
+    # 与 black 冲突的规则
+    E203,  # whitespace before ':'
+    W503,  # line break before binary operator
+    W504,  # line break after binary operator
+    
+    # 文档字符串相关（可根据需要调整）
+    D100,  # Missing docstring in public module
+    D101,  # Missing docstring in public class
+    D102,  # Missing docstring in public method
+    D103,  # Missing docstring in public function
+    D104,  # Missing docstring in public package
+    D105,  # Missing docstring in magic method
+    D107,  # Missing docstring in __init__
+    
+    # 其他规则
+    F401,  # imported but unused (handled by isort and mypy)
+    
+# 扩展忽略（针对特定情况）
+extend-ignore = 
+    # __init__.py 文件中的未使用导入
+    F401,
+    # 测试文件中的断言
+    S101,
+
+# 每行导入数量限制
+max-imports = 20
+
+# 排除的文件和目录
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    .env,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    node_modules,
+    
+    # 数据库迁移文件
+    alembic/versions/*.py,
+    migrations/*.py,
+    
+    # 生成的文件
+    *_pb2.py,
+    *_pb2_grpc.py,
+
+# 包含的文件模式
+filename = 
+    *.py
+
+# 选择的错误类型
+select = 
+    # pyflakes
+    F,
+    # pycodestyle errors
+    E,
+    # pycodestyle warnings  
+    W,
+    # mccabe complexity
+    C,
+    # import order
+    I,
+    # bugbear
+    B,
+    # comprehensions
+    C4,
+    # simplify
+    SIM,
+
+# 针对特定文件的规则
+per-file-ignores = 
+    # __init__.py 文件允许未使用的导入
+    __init__.py:F401,F403,
+    
+    # 测试文件的特殊规则
+    tests/*.py:S101,S106,D,
+    test_*.py:S101,S106,D,
+    *_test.py:S101,S106,D,
+    
+    # 配置文件
+    settings.py:F405,
+    config.py:F405,
+    
+    # 脚本文件
+    scripts/*.py:T201,T203,
+    
+    # Alembic 迁移文件
+    alembic/versions/*.py:D,F401,E501,
+    
+    # 主入口文件
+    main.py:F401,
+    app.py:F401,
+
+# 文档字符串约定
+docstring-convention = google
+
+# 导入顺序检查
+import-order-style = google
+
+# 应用程序导入名称
+application-import-names = app,web_interface
+
+# 内联引号风格
+inline-quotes = single
+
+# 多行字符串引号风格  
+multiline-quotes = double
+
+# 文档字符串引号风格
+docstring-quotes = double
+
+# 是否避免转义引号
+avoid-escape = True
+
+# 注释行的最大长度
+max-comment-length = 88
+
+# 是否计算字符串中的换行符
+count = True
+
+# 是否显示源代码
+show-source = True
+
+# 是否显示 pep8 相关信息
+show-pep8 = True
+
+# 统计信息
+statistics = True
+
+# 基准文件
+benchmark = True
+
+# 退出代码（遇到错误时的退出码）
+exit-zero = False
+
+# 作业数量（并行处理）
+jobs = auto
+
+# 输出格式
+format = default
+
+# 是否启用详细模式
+verbose = 0
+
+# 是否启用安静模式  
+quiet = 0
+
+# 挂钩配置
+hang-closing = False
+
+# 是否在每个错误后停止
+max-exit-first = False
+
+# ==================== 插件特定配置 ====================
+
+# flake8-docstrings 配置
+strictness = short
+docstring-style = google
+
+# flake8-import-order 配置  
+import-order-style = google
+application-import-names = app
+
+# flake8-bugbear 配置
+extend-immutable-calls = 
+    fastapi.Depends,
+    fastapi.Query,
+    fastapi.Path,
+    fastapi.Body,
+    fastapi.Header,
+    fastapi.Cookie,
+    fastapi.Form,
+    fastapi.File,
+    fastapi.Security,
+
+# flake8-comprehensions 配置
+# (使用默认配置)
+
+# flake8-simplify 配置
+# (使用默认配置)
+
+# ==================== 自定义规则配置 ====================
+
+# 针对 FastAPI 的特殊规则
+extend-ignore-fastapi = 
+    # FastAPI 依赖注入函数可能未使用参数
+    ARG001,
+    ARG002,
+
+# 针对 SQLAlchemy 的特殊规则  
+extend-ignore-sqlalchemy =
+    # SQLAlchemy 模型可能有未使用的导入
+    F401,
+
+# 针对 Pydantic 的特殊规则
+extend-ignore-pydantic = 
+    # Pydantic 模型的字段定义
+    F841,
+
+# ==================== 项目特定配置 ====================
+
+# TradeMaster 项目特定忽略
+project-ignore = 
+    # 允许在某些文件中使用 print
+    T201:scripts/*.py,
+    
+    # 允许在配置文件中使用复杂表达式
+    C901:config.py,settings.py,
+    
+    # 允许在测试中使用断言
+    S101:test_*.py,tests/*.py,
+
+# ==================== 使用说明 ====================
+# 
+# 运行方式:
+# flake8 app/                    # 检查 app 目录
+# flake8 app/ tests/            # 检查多个目录  
+# flake8 --statistics app/      # 显示统计信息
+# flake8 --show-source app/     # 显示源代码
+# 
+# 配置优先级:
+# 1. 命令行参数
+# 2. setup.cfg 或 .flake8 文件
+# 3. 默认配置
+# 
+# 与其他工具集成:
+# - 与 black 兼容的配置
+# - 与 isort 兼容的导入检查
+# - 与 mypy 互补的类型检查
+# - 与 pre-commit 集成

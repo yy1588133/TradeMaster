@@ -1,0 +1,582 @@
+# ==================== TradeMaster Web Interface 生产环境配置 ====================
+# 用于生产部署的Docker Compose配置
+# 启动命令: docker-compose -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  # ==================== 数据库服务 ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: trademaster-postgres-prod
+    hostname: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - postgres_prod_backups:/backups
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./docker/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./docker/postgres/init-prod.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - trademaster-backend
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:rw,size=100m
+      - /var/run/postgresql:rw,size=100m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+        compress: "true"
+
+  # ==================== Redis缓存服务 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: trademaster-redis-prod
+    hostname: redis
+    restart: always
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - redis_prod_data:/data
+      - ./docker/redis/redis-prod.conf:/etc/redis/redis.conf:ro
+    command: redis-server /etc/redis/redis.conf --requirepass "${REDIS_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - trademaster-backend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=50m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        compress: "true"
+
+  # ==================== 后端API服务 ====================
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+    image: trademaster-backend:${VERSION:-latest}
+    container_name: trademaster-backend-prod
+    hostname: backend
+    restart: always
+    environment:
+      # 从环境文件加载
+      PROJECT_NAME: ${PROJECT_NAME}
+      VERSION: ${VERSION}
+      DEBUG: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # 服务器配置
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8000"
+      
+      # 数据库配置
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+      
+      # Redis配置
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      
+      # 安全配置
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # CORS配置
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      
+      # TradeMaster集成
+      TRADEMASTER_API_URL: ${TRADEMASTER_API_URL}
+      TRADEMASTER_DATA_PATH: "/app/trademaster_data"
+      
+      # 生产特殊配置
+      AUTO_RELOAD: "false"
+      SHOW_ERROR_DETAILS: "false"
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      
+      # 监控配置
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      
+      # 时区
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - backend_prod_data:/app/data
+      - backend_prod_logs:/app/logs
+      - backend_prod_uploads:/app/uploads
+      - trademaster_shared_data:/app/trademaster_data:ro
+      - trademaster_shared_configs:/app/trademaster_configs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/health-check.sh", "quick"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    networks:
+      - trademaster-backend
+      - trademaster-frontend
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        failure_action: pause
+        order: stop-first
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=200m
+      - /app/temp:rw,size=500m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "20"
+        compress: "true"
+
+  # ==================== 前端Web服务 ====================
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
+        REACT_APP_WS_URL: ${REACT_APP_WS_URL}
+        BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
+    image: trademaster-frontend:${VERSION:-latest}
+    container_name: trademaster-frontend-prod
+    hostname: frontend
+    restart: always
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: 8000
+      NGINX_WORKER_PROCESSES: ${NGINX_WORKER_PROCESSES:-auto}
+      NGINX_WORKER_CONNECTIONS: ${NGINX_WORKER_CONNECTIONS:-2048}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - frontend_prod_logs:/var/log/nginx
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "/health-check.sh", "quick"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    networks:
+      - trademaster-frontend
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=100m
+      - /var/run:rw,size=50m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+        compress: "true"
+
+  # ==================== Nginx负载均衡器 ====================
+  nginx:
+    image: nginx:alpine
+    container_name: trademaster-nginx-prod
+    hostname: nginx-lb
+    restart: always
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_prod_logs:/var/log/nginx
+      - nginx_cache:/var/cache/nginx
+      - ./docker/nginx/html:/usr/share/nginx/html:ro
+    depends_on:
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    networks:
+      - trademaster-frontend
+      - external
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.125'
+    security_opt:
+      - no-new-privileges:true
+      - apparmor:docker-default
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    read_only: true
+    tmpfs:
+      - /tmp:rw,size=50m
+      - /var/run:rw,size=20m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "15"
+        compress: "true"
+
+  # ==================== 监控和备份服务 ====================
+  # Prometheus监控
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: trademaster-prometheus-prod
+    hostname: prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_prod_data:/prometheus
+    networks:
+      - trademaster-monitoring
+      - trademaster-backend
+    profiles:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Grafana仪表板
+  grafana:
+    image: grafana/grafana:latest
+    container_name: trademaster-grafana-prod
+    hostname: grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_prod_data:/var/lib/grafana
+      - ./docker/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks:
+      - trademaster-monitoring
+    profiles:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # 数据库备份服务
+  backup:
+    image: postgres:15-alpine
+    container_name: trademaster-backup-prod
+    hostname: backup
+    restart: "no"
+    environment:
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      PGHOST: postgres
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - postgres_prod_backups:/backups
+      - ./docker/backup/backup.sh:/backup.sh:ro
+    command: /backup.sh
+    depends_on:
+      - postgres
+    networks:
+      - trademaster-backend
+    profiles:
+      - backup
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ==================== 网络配置 ====================
+networks:
+  # 外部访问网络
+  external:
+    name: trademaster-external
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: tm-external
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/24
+
+  # 前端网络
+  trademaster-frontend:
+    name: trademaster-frontend
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.name: tm-frontend
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/24
+
+  # 后端网络
+  trademaster-backend:
+    name: trademaster-backend
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: tm-backend
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.23.0.0/24
+
+  # 监控网络
+  trademaster-monitoring:
+    name: trademaster-monitoring
+    driver: bridge
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: tm-monitoring
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.24.0.0/24
+
+# ==================== 数据卷配置 ====================
+volumes:
+  # PostgreSQL数据
+  postgres_prod_data:
+    name: trademaster-postgres-prod-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/postgres/data
+
+  # PostgreSQL备份
+  postgres_prod_backups:
+    name: trademaster-postgres-prod-backups
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/postgres/backups
+
+  # Redis数据
+  redis_prod_data:
+    name: trademaster-redis-prod-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/redis/data
+
+  # 后端数据
+  backend_prod_data:
+    name: trademaster-backend-prod-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/backend/data
+
+  # 后端日志
+  backend_prod_logs:
+    name: trademaster-backend-prod-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/backend/logs
+
+  # 后端上传
+  backend_prod_uploads:
+    name: trademaster-backend-prod-uploads
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/backend/uploads
+
+  # 前端日志
+  frontend_prod_logs:
+    name: trademaster-frontend-prod-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/frontend/logs
+
+  # Nginx日志
+  nginx_prod_logs:
+    name: trademaster-nginx-prod-logs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_ROOT:-/opt/trademaster}/nginx/logs
+
+  # Nginx缓存
+  nginx_cache:
+    name: trademaster-nginx-cache
+    driver: local
+
+  # TradeMaster共享数据
+  trademaster_shared_data:
+    name: trademaster-shared-data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TRADEMASTER_DATA_ROOT:-/opt/trademaster}/shared/data
+
+  # TradeMaster配置
+  trademaster_shared_configs:
+    name: trademaster-shared-configs
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${TRADEMASTER_DATA_ROOT:-/opt/trademaster}/shared/configs
+
+  # Prometheus数据
+  prometheus_prod_data:
+    name: trademaster-prometheus-prod-data
+    driver: local
+
+  # Grafana数据
+  grafana_prod_data:
+    name: trademaster-grafana-prod-data
+    driver: local

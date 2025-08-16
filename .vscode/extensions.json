@@ -1,0 +1,115 @@
+{
+  "// ==================== TradeMaster Web Interface VS Code 扩展推荐 ====================": "",
+  
+  "recommendations": [
+    "// ==================== Python 开发扩展 ====================": "",
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "ms-python.isort",
+    "ms-python.pylint",
+    "ms-python.mypy-type-checker",
+    "ms-python.debugpy",
+    
+    "// ==================== JavaScript/TypeScript 开发扩展 ====================": "",
+    "ms-vscode.vscode-typescript-next",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-json",
+    
+    "// ==================== React 开发扩展 ====================": "",
+    "ms-vscode.vscode-react-javascript",
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "jpoissonnier.vscode-styled-components",
+    
+    "// ==================== 前端工具扩展 ====================": "",
+    "antfu.vite",
+    "vue.vscode-typescript-vue-plugin",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-css-peek",
+    "zignd.html-css-class-completion",
+    
+    "// ==================== 数据库扩展 ====================": "",
+    "ms-mssql.mssql",
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg",
+    "ckolkman.vscode-postgres",
+    
+    "// ==================== Docker 和容器扩展 ====================": "",
+    "ms-azuretools.vscode-docker",
+    "ms-vscode-remote.remote-containers",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+    
+    "// ==================== Git 和版本控制扩展 ====================": "",
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "github.vscode-pull-request-github",
+    "github.copilot",
+    "github.copilot-chat",
+    
+    "// ==================== 配置文件扩展 ====================": "",
+    "redhat.vscode-yaml",
+    "dotenv.dotenv-vscode",
+    "tamasfe.even-better-toml",
+    "ms-vscode.makefile-tools",
+    
+    "// ==================== 代码质量和测试扩展 ====================": "",
+    "ms-vscode.test-adapter-converter",
+    "hbenl.vscode-test-explorer",
+    "littlefoxteam.vscode-python-test-adapter",
+    "ms-playwright.playwright",
+    "orta.vscode-jest",
+    
+    "// ==================== Markdown 和文档扩展 ====================": "",
+    "yzhang.markdown-all-in-one",
+    "shd101wyy.markdown-preview-enhanced",
+    "davidanson.vscode-markdownlint",
+    "bierner.markdown-mermaid",
+    
+    "// ==================== 实用工具扩展 ====================": "",
+    "ms-vscode.powershell",
+    "foxundermoon.shell-format",
+    "timonwong.shellcheck",
+    "aaron-bond.better-comments",
+    "alefragnani.bookmarks",
+    "gruntfuggly.todo-tree",
+    "streetsidesoftware.code-spell-checker",
+    
+    "// ==================== 主题和界面扩展 ====================": "",
+    "pkief.material-icon-theme",
+    "zhuangtongfa.material-theme",
+    "github.github-vscode-theme",
+    "dracula-theme.theme-dracula",
+    
+    "// ==================== 性能和调试扩展 ====================": "",
+    "ms-vscode.vscode-serial-monitor",
+    "ms-vscode.hexeditor",
+    "humao.rest-client",
+    "rangav.vscode-thunder-client",
+    
+    "// ==================== 安全扩展 ====================": "",
+    "ms-vscode.vscode-github-issue-notebooks",
+    "snyk-security.snyk-vulnerability-scanner",
+    
+    "// ==================== 协作扩展 ====================": "",
+    "ms-vsliveshare.vsliveshare",
+    "ms-vscode.remote-explorer",
+    
+    "// ==================== API 开发扩展 ====================": "",
+    "42crunch.vscode-openapi",
+    "arjun.swagger-viewer",
+    "rangav.vscode-thunder-client",
+    
+    "// ==================== 国际化扩展 ====================": "",
+    "ms-ceintl.vscode-language-pack-zh-hans"
+  ],
+  
+  "unwantedRecommendations": [
+    "// 不推荐的扩展（可能与项目配置冲突）": "",
+    "ms-python.flake8",
+    "ms-python.autopep8",
+    "hookyqr.beautify",
+    "vscode.typescript-language-features"
+  ]
+}
