@@ -104,7 +104,6 @@ services:
         BUILD_ENV: production
         BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     image: trademaster-backend:${VERSION:-latest}
-    container_name: trademaster-backend-prod
     hostname: backend
     restart: always
     environment:
@@ -215,7 +214,6 @@ services:
         REACT_APP_WS_URL: ${REACT_APP_WS_URL}
         BUILD_DATE: ${BUILD_DATE:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}
     image: trademaster-frontend:${VERSION:-latest}
-    container_name: trademaster-frontend-prod
     hostname: frontend
     restart: always
     environment:
@@ -275,7 +273,6 @@ services:
   # ==================== Nginx负载均衡器 ====================
   nginx:
     image: nginx:alpine
-    container_name: trademaster-nginx-prod
     hostname: nginx-lb
     restart: always
     environment:
