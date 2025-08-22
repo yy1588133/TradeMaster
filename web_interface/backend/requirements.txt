@@ -1,16 +1,23 @@
+# ==================== TradeMaster Web Interface Backend 依赖配置 ====================
+# Web界面后端服务的完整依赖列表
+# 与TradeMaster核心保持版本兼容
+
 # ==================== 核心框架 ====================
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # ==================== 数据库相关 ====================
+# 与根目录保持SQLAlchemy版本一致
 sqlalchemy==2.0.23
 asyncpg==0.29.0
 alembic==1.12.1
-psycopg2-binary==2.9.9
+# 移除psycopg2-binary以避免与asyncpg冲突
+# psycopg2-binary==2.9.9
 
 # ==================== 缓存和队列 ====================
 redis==5.0.1
+# 与根目录保持celery版本一致
 celery==5.3.4
 flower==2.0.1
 
@@ -20,6 +27,7 @@ passlib[bcrypt]==1.7.4
 cryptography==41.0.7
 
 # ==================== 数据验证和序列化 ====================
+# 统一使用pydantic v2，与FastAPI和TradeMaster核心兼容
 pydantic==2.5.0
 pydantic-settings==2.1.0
 email-validator==2.1.0
@@ -36,8 +44,9 @@ loguru==0.7.2
 structlog==23.2.0
 
 # ==================== 数据处理 ====================
+# 与TradeMaster核心保持numpy版本兼容(TensorFlow 2.11.0要求)
 pandas==2.1.4
-numpy==1.26.2
+numpy==1.23.5
 openpyxl==3.1.2
 
 # ==================== 工具库 ====================
@@ -50,20 +59,14 @@ python-dateutil==2.8.2
 prometheus-client==0.19.0
 sentry-sdk[fastapi]==1.38.0
 
-# ==================== 开发工具 ====================
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-pytest-mock==3.12.0
-black==23.11.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
-pre-commit==3.6.0
-
-# ==================== 测试数据生成 ====================
-factory-boy==3.3.0
-faker==20.1.0
-
 # ==================== 部署相关 ====================
 gunicorn==21.2.0
+
+# ==================== TradeMaster集成依赖 ====================
+# 为了与TradeMaster核心集成，需要包含关键的ML依赖
+# 修复Python 3.11兼容性问题
+tensorflow==2.12.0
+scipy==1.10.1
+scikit-learn==1.3.2
+matplotlib==3.7.5
+plotly==5.17.0

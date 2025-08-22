@@ -96,15 +96,30 @@ app = FastAPI(
 
 # ==================== 中间件配置 ====================
 
-# CORS中间件
-if settings.BACKEND_CORS_ORIGINS:
+# CORS中间件 - 处理环境变量中的CORS配置
+cors_origins = settings.BACKEND_CORS_ORIGINS
+if isinstance(cors_origins, str):
+    # 如果是字符串，按逗号分割
+    cors_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+elif not isinstance(cors_origins, list):
+    # 如果既不是字符串也不是列表，使用默认值
+    cors_origins = ["http://localhost:3000", "http://localhost:3100", "http://127.0.0.1:3100"]
+
+# 从环境变量覆盖CORS配置
+import os
+env_cors = os.getenv("BACKEND_CORS_ORIGINS")
+if env_cors:
+    cors_origins = [origin.strip() for origin in env_cors.split(",") if origin.strip()]
+
+if cors_origins:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    logger.info(f"✅ CORS配置: {cors_origins}")
 
 # 受信任主机中间件
 if settings.ALLOWED_HOSTS:

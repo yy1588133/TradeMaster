@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from pydantic import Field, validator, root_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.schemas.base import BaseSchema, TimestampSchema, UUIDSchema
 from app.models.database import TrainingStatus
@@ -75,7 +75,8 @@ class TrainingJobBase(BaseSchema):
     )
     description: Optional[str] = Field(None, description="任务描述")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证任务名称"""
         if not v or not v.strip():
@@ -106,19 +107,20 @@ class TrainingConfig(BaseSchema):
     patience: int = Field(10, ge=1, description="早停耐心值")
     save_checkpoints: bool = Field(True, description="是否保存检查点")
     checkpoint_interval: int = Field(100, ge=1, description="检查点保存间隔")
-    
-    @validator('task_name')
+    @field_validator('task_name')
+    @classmethod
     def validate_task_name(cls, v):
         """验证任务名称"""
         allowed_tasks = [
-            'algorithmic_trading', 'portfolio_management', 
+            'algorithmic_trading', 'portfolio_management',
             'order_execution', 'high_frequency_trading'
         ]
         if v not in allowed_tasks:
             raise ValueError(f'task_name必须是: {", ".join(allowed_tasks)}')
         return v
     
-    @validator('agent_name')
+    @field_validator('agent_name')
+    @classmethod
     def validate_agent_name(cls, v):
         """验证智能体名称格式"""
         # 格式应该是 task_type:agent_type
@@ -132,12 +134,14 @@ class TrainingConfig(BaseSchema):
         
         return v
     
-    @validator('device')
+    @field_validator('device')
+    @classmethod
     def validate_device(cls, v):
         """验证设备配置"""
         allowed_devices = ['auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1']
         if v not in allowed_devices and not v.startswith('cuda:'):
             raise ValueError('device必须是auto、cpu或cuda相关设备')
+        return v
         return v
 
 
@@ -165,7 +169,8 @@ class HyperParameters(BaseSchema):
     weight_decay: float = Field(0.0001, ge=0, description="权重衰减")
     gradient_clip: Optional[float] = Field(None, gt=0, description="梯度裁剪")
     
-    @validator('hidden_layers')
+    @field_validator('hidden_layers')
+    @classmethod
     def validate_hidden_layers(cls, v):
         """验证隐藏层配置"""
         if not v:
@@ -174,7 +179,8 @@ class HyperParameters(BaseSchema):
             raise ValueError('隐藏层大小必须大于0')
         return v
     
-    @validator('activation')
+    @field_validator('activation')
+    @classmethod
     def validate_activation(cls, v):
         """验证激活函数"""
         allowed_activations = ['relu', 'tanh', 'sigmoid', 'leaky_relu', 'elu']
@@ -203,7 +209,8 @@ class TrainingJobUpdate(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="任务名称")
     description: Optional[str] = Field(None, description="任务描述")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证任务名称"""
         if v is not None:
@@ -350,7 +357,8 @@ class MetricsQuery(BaseSchema):
     metrics: Optional[List[str]] = Field(None, description="指定指标列表")
     interval: int = Field(1, ge=1, description="采样间隔")
     
-    @root_validator
+    @model_validator(mode='before')
+    @classmethod
     def validate_epoch_range(cls, values):
         """验证轮次范围"""
         start_epoch = values.get('start_epoch')
@@ -416,7 +424,8 @@ class TrainingJobClone(BaseSchema):
     modify_config: bool = Field(False, description="是否修改配置")
     config_updates: Optional[Dict[str, Any]] = Field(None, description="配置更新")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证任务名称"""
         if not v or not v.strip():
@@ -437,7 +446,8 @@ class TrainingJobListQuery(BaseSchema):
     end_date: Optional[datetime] = Field(None, description="结束时间筛选")
     sort: Optional[str] = Field("created_at:desc", description="排序字段")
     
-    @validator('sort')
+    @field_validator('sort')
+    @classmethod
     def validate_sort(cls, v):
         """验证排序参数"""
         if v is None:
@@ -460,7 +470,8 @@ class TrainingJobListQuery(BaseSchema):
                 raise ValueError(f'排序字段必须是: {", ".join(allowed_fields)}')
             return f"{v}:asc"
     
-    @root_validator
+    @model_validator(mode='before')
+    @classmethod
     def validate_date_range(cls, values):
         """验证日期范围"""
         start_date = values.get('start_date')

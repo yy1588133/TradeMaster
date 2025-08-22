@@ -313,7 +313,7 @@ class ErrorHandler:
             error_category = exception.error_category
             message = exception.message
             detail = exception.detail
-            metadata = exception.metadata.copy()
+            metadata = exception.extra_metadata.copy()
         else:
             error_code = self._map_exception_to_error_code(exception)
             error_level = self._map_exception_to_error_level(exception)

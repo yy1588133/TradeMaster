@@ -69,9 +69,9 @@ class TrainingJobUpdateRequest(BaseModel):
 @router.post("/jobs", response_model=Dict[str, Any])
 async def create_training_job(
     request: TrainingJobRequest,
-    background_tasks: BackgroundTasks,
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    background_tasks: BackgroundTasks
 ):
     """
     创建训练任务
@@ -110,9 +110,9 @@ async def create_training_job(
 @router.post("/jobs/batch", response_model=Dict[str, Any])
 async def create_batch_training_jobs(
     request: BatchTrainingRequest,
-    background_tasks: BackgroundTasks,
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    background_tasks: BackgroundTasks
 ):
     """
     创建批量训练任务
@@ -147,15 +147,15 @@ async def create_batch_training_jobs(
 
 @router.get("/jobs", response_model=Dict[str, Any])
 async def list_training_jobs(
+    current_user: CurrentUser,
+    db: DatabaseSession,
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     status: Optional[str] = Query(None, description="任务状态筛选"),
     strategy_id: Optional[str] = Query(None, description="策略ID筛选"),
     priority: Optional[int] = Query(None, description="优先级筛选"),
     sort_by: str = Query("created_at", description="排序字段"),
-    sort_order: str = Query("desc", description="排序方向"),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    sort_order: str = Query("desc", description="排序方向")
 ):
     """
     获取训练任务列表
@@ -192,10 +192,10 @@ async def list_training_jobs(
 @router.get("/jobs/{job_id}", response_model=Dict[str, Any])
 async def get_training_job(
     job_id: str,
-    include_logs: bool = Query(False, description="是否包含日志"),
-    include_metrics: bool = Query(True, description="是否包含指标"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    include_logs: bool = Query(False, description="是否包含日志"),
+    include_metrics: bool = Query(True, description="是否包含指标")
 ):
     """
     获取训练任务详情
@@ -256,9 +256,9 @@ async def start_training_job(
 @router.post("/jobs/{job_id}/stop", response_model=Dict[str, Any])
 async def stop_training_job(
     job_id: str,
-    force: bool = Query(False, description="是否强制停止"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    force: bool = Query(False, description="是否强制停止")
 ):
     """
     停止训练任务
@@ -289,9 +289,9 @@ async def stop_training_job(
 @router.post("/hyperparameter-optimization", response_model=Dict[str, Any])
 async def start_hyperparameter_optimization(
     request: HyperparameterOptimizationRequest,
-    background_tasks: BackgroundTasks,
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    background_tasks: BackgroundTasks
 ):
     """
     启动超参数优化
@@ -331,11 +331,11 @@ async def start_hyperparameter_optimization(
 @router.get("/jobs/{job_id}/metrics", response_model=Dict[str, Any])
 async def get_training_metrics(
     job_id: str,
+    current_user: CurrentUser,
+    db: DatabaseSession,
     metric_type: Optional[str] = Query(None, description="指标类型"),
     start_time: Optional[str] = Query(None, description="开始时间"),
-    end_time: Optional[str] = Query(None, description="结束时间"),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    end_time: Optional[str] = Query(None, description="结束时间")
 ):
     """
     获取训练指标

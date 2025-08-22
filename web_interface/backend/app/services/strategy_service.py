@@ -72,7 +72,7 @@ class StrategyService:
     
     def __init__(self):
         """初始化策略服务"""
-        self.config_adapter = get_trademaster_config_adapter()
+        self.config_adapter = get_config_adapter()
         self.trademaster_service = get_trademaster_service()
         
         # 策略类型到TradeMaster任务类型的映射

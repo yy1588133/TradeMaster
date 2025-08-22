@@ -150,6 +150,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+# 为兼容性提供别名
+get_async_db = get_db
+
+
 async def init_database() -> None:
     """初始化数据库
     
@@ -309,12 +313,13 @@ class DatabaseManager:
 # 导出主要组件
 __all__ = [
     "Base",
-    "engine", 
+    "engine",
     "AsyncSessionLocal",
     "get_db_session",
     "get_db",
+    "get_async_db",
     "init_database",
-    "drop_database", 
+    "drop_database",
     "check_database_connection",
     "get_database_info",
     "DatabaseManager"

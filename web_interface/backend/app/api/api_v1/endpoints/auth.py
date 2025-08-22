@@ -304,9 +304,9 @@ async def get_current_user_info(
 
 @router.put("/me", response_model=UserResponseModel, summary="更新用户信息")
 async def update_user_info(
-    user_update: Dict[str, Any] = Body(...),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    user_update: Dict[str, Any] = Body(...)
 ) -> UserResponseModel:
     """更新用户信息
     

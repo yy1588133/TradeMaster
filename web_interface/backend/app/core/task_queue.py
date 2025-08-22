@@ -386,7 +386,7 @@ class TaskQueue:
             task.last_heartbeat = datetime.utcnow()
             
             if message:
-                task.metadata["progress_message"] = message
+                task.extra_metadata["progress_message"] = message
             
             await self._update_task(task)
             
@@ -424,7 +424,7 @@ class TaskQueue:
             # 计算执行时长
             if task.started_at:
                 duration = (task.completed_at - task.started_at).total_seconds()
-                task.metadata["duration"] = duration
+                task.extra_metadata["duration"] = duration
             
             await self._update_task(task)
             
@@ -597,7 +597,7 @@ class TaskQueue:
                         completed_at=task.completed_at,
                         retry_count=task.retry_count,
                         progress=task.progress,
-                        metadata=task.metadata
+                        metadata=task.extra_metadata
                     )
                 return None
             
@@ -743,7 +743,7 @@ class TaskQueue:
             duration=(task.completed_at - task.started_at).total_seconds() if task.started_at and task.completed_at else None,
             retry_count=task.retry_count,
             progress=task.progress,
-            metadata=task.metadata
+            metadata=task.extra_metadata
         )
         
         result_key = f"{self.result_prefix}:{task.task_id}"

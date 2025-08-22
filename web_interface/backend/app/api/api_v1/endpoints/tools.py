@@ -521,9 +521,9 @@ async def get_tool_config_template(
 
 @router.get("/documentation", response_model=Dict[str, Any])
 async def get_tools_documentation(
-    tool_type: Optional[ToolType] = Query(None, description="工具类型"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    tool_type: Optional[ToolType] = Query(None, description="工具类型")
 ):
     """
     获取工具文档

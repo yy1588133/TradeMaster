@@ -15,17 +15,58 @@ from typing import Dict, Any, Optional, List, Union, Callable
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, Future
 
-import torch
 import numpy as np
 from loguru import logger
-from mmengine.config import Config
 
 # 添加TradeMaster到Python路径
-TRADEMASTER_ROOT = str(Path(__file__).resolve().parents[4])
-if TRADEMASTER_ROOT not in sys.path:
-    sys.path.append(TRADEMASTER_ROOT)
-
+# 在Docker容器中，使用环境变量或者动态检测
 try:
+    # 尝试从环境变量获取
+    TRADEMASTER_ROOT = os.environ.get('TRADEMASTER_ROOT')
+    if not TRADEMASTER_ROOT:
+        # 动态检测：从当前文件向上查找，直到找到trademaster目录或到达根目录
+        current_dir = Path(__file__).resolve()
+        max_levels = min(6, len(current_dir.parts))  # 防止IndexError
+        for i in range(max_levels):
+            try:
+                potential_root = current_dir.parents[i]
+                # 检查是否存在trademaster相关文件/目录
+                if (potential_root / 'trademaster').exists() or \
+                   (potential_root / 'setup.py').exists() or \
+                   (potential_root / 'pyproject.toml').exists():
+                    TRADEMASTER_ROOT = str(potential_root)
+                    break
+            except IndexError:
+                break
+        else:
+            # 如果都没找到，使用默认路径或当前目录的上级
+            TRADEMASTER_ROOT = str(current_dir.parent.parent.parent) if len(current_dir.parts) > 3 else str(current_dir.parent)
+    
+    # 添加到Python路径
+    if TRADEMASTER_ROOT not in sys.path:
+        sys.path.append(TRADEMASTER_ROOT)
+        
+    logger.info(f"TradeMaster根目录设置为: {TRADEMASTER_ROOT}")
+    
+except Exception as e:
+    # 如果路径检测失败，使用相对安全的默认值
+    TRADEMASTER_ROOT = "/app"  # Docker容器中的应用根目录
+    logger.warning(f"TradeMaster根目录检测失败，使用默认值: {TRADEMASTER_ROOT}, 错误: {str(e)}")
+
+# PyTorch可选依赖
+try:
+    import torch
+    TORCH_AVAILABLE = True
+    logger.info("PyTorch模块导入成功")
+except ImportError as e:
+    torch = None
+    TORCH_AVAILABLE = False
+    logger.warning(f"PyTorch模块不可用: {str(e)}")
+
+# TradeMaster核心模块可选依赖
+try:
+    from mmengine.config import Config
+    
     # 导入TradeMaster核心模块
     from trademaster.agents.builder import build_agent, AGENTS
     from trademaster.datasets.builder import build_dataset, DATASETS
@@ -43,6 +84,9 @@ try:
     logger.info("TradeMaster核心模块导入成功")
     
 except ImportError as e:
+    Config = None
+    build_agent = build_dataset = build_environment = build_from_cfg = None
+    AGENTS = DATASETS = ENVIRONMENTS = None
     TRADEMASTER_AVAILABLE = False
     logger.warning(f"TradeMaster核心模块导入失败: {str(e)}")
 
@@ -132,9 +176,13 @@ class TradeMasterCore:
         self.sessions: Dict[str, TrainingSession] = {}
         self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="TradeMaster")
         
-        # 设置设备
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        logger.info(f"TradeMaster核心服务初始化完成，设备: {self.device}")
+        # 设置设备（PyTorch可选）
+        if TORCH_AVAILABLE:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            logger.info(f"TradeMaster核心服务初始化完成，设备: {self.device}")
+        else:
+            self.device = "cpu"  # 回退到字符串表示
+            logger.info(f"TradeMaster核心服务初始化完成，设备: {self.device} (PyTorch不可用)")
     
     # ==================== 组件管理 ====================
     
@@ -603,11 +651,12 @@ class TradeMasterCore:
         """
         return {
             "trademaster_available": TRADEMASTER_AVAILABLE,
+            "torch_available": TORCH_AVAILABLE,
             "device": str(self.device),
             "active_sessions": len(self.sessions),
             "session_ids": list(self.sessions.keys()),
             "python_version": sys.version,
-            "torch_version": torch.__version__ if TRADEMASTER_AVAILABLE else None,
+            "torch_version": torch.__version__ if TORCH_AVAILABLE else None,
             "root_path": TRADEMASTER_ROOT
         }
     

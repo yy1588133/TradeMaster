@@ -22,9 +22,44 @@ from app.core.config import settings
 class StrategyType(str, Enum):
     """策略类型枚举"""
     ALGORITHMIC_TRADING = "algorithmic_trading"
-    PORTFOLIO_MANAGEMENT = "portfolio_management" 
+    PORTFOLIO_MANAGEMENT = "portfolio_management"
     ORDER_EXECUTION = "order_execution"
     HIGH_FREQUENCY_TRADING = "high_frequency_trading"
+
+
+class TaskType(str, Enum):
+    """TradeMaster任务类型枚举"""
+    ALGORITHMIC_TRADING = "algorithmic_trading"
+    PORTFOLIO_MANAGEMENT = "portfolio_management"
+    ORDER_EXECUTION = "order_execution"
+    HIGH_FREQUENCY_TRADING = "high_frequency_trading"
+
+
+class AgentType(str, Enum):
+    """智能体类型枚举"""
+    DQN = "dqn"
+    DDQN = "ddqn"
+    PPO = "ppo"
+    SAC = "sac"
+    TD3 = "td3"
+    A2C = "a2c"
+    EIIE = "eiie"
+    ETEO = "eteo"
+    SARL = "sarl"
+    INVESTOR_IMITATOR = "investor_imitator"
+
+
+class DatasetType(str, Enum):
+    """数据集类型枚举"""
+    BTC = "BTC"
+    ETH = "ETH"
+    DOW30 = "dj30"
+    NASDAQ100 = "nasdaq100"
+    SP500 = "sp500"
+    CSI300 = "csi300"
+    CRYPTO = "crypto"
+    FOREX = "forex"
+    COMMODITY = "commodity"
 
 
 class ConfigFormat(str, Enum):
@@ -607,9 +642,12 @@ def get_config_adapter() -> TradeMasterConfigAdapter:
 # 导出主要类和函数
 __all__ = [
     "TradeMasterConfigAdapter",
-    "WebStrategyConfig", 
+    "WebStrategyConfig",
     "TradeMasterNativeConfig",
     "StrategyType",
+    "TaskType",
+    "AgentType",
+    "DatasetType",
     "ConfigFormat",
     "TradeMasterConfigError",
     "get_config_adapter"

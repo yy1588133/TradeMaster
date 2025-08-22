@@ -394,7 +394,7 @@ async def test_system_log_model(session: AsyncSession):
         
         if (retrieved_log and 
             retrieved_log.level == LogLevel.INFO and
-            retrieved_log.metadata["test_data"] == "value"):
+            retrieved_log.extra_metadata["test_data"] == "value"):
             log_test_result("系统日志模型测试", True, f"日志ID: {log_entry.id}")
         else:
             log_test_result("系统日志模型测试", False, "", "系统日志创建或查询失败")

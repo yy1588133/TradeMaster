@@ -67,6 +67,8 @@ class DataDownloadRequest(BaseModel):
 @router.post("/upload", response_model=Dict[str, Any])
 async def upload_data(
     background_tasks: BackgroundTasks,
+    current_user: CurrentUser,
+    db: DatabaseSession,
     file: UploadFile = File(...),
     name: str = Form(...),
     description: str = Form(""),
@@ -74,9 +76,7 @@ async def upload_data(
     symbols: str = Form(""),
     start_date: str = Form(""),
     end_date: str = Form(""),
-    tags: str = Form(""),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    tags: str = Form("")
 ):
     """
     上传数据文件
@@ -127,10 +127,10 @@ async def upload_data(
 @router.post("/upload/batch", response_model=Dict[str, Any])
 async def upload_batch_data(
     background_tasks: BackgroundTasks,
-    files: List[UploadFile] = File(...),
-    batch_config: str = Form(...),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    files: List[UploadFile] = File(...),
+    batch_config: str = Form(...)
 ):
     """
     批量上传数据文件
@@ -170,6 +170,8 @@ async def upload_batch_data(
 
 @router.get("/datasets", response_model=Dict[str, Any])
 async def list_datasets(
+    current_user: CurrentUser,
+    db: DatabaseSession,
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, description="搜索关键词"),
@@ -177,8 +179,6 @@ async def list_datasets(
     tags: Optional[str] = Query(None, description="标签筛选，逗号分隔"),
     sort_by: str = Query("created_at", description="排序字段"),
     sort_order: str = Query("desc", description="排序方向"),
-    current_user: CurrentUser,
-    db: DatabaseSession
 ):
     """
     获取数据集列表
@@ -215,10 +215,10 @@ async def list_datasets(
 @router.get("/datasets/{dataset_id}", response_model=Dict[str, Any])
 async def get_dataset(
     dataset_id: str,
-    include_preview: bool = Query(True, description="是否包含数据预览"),
-    preview_rows: int = Query(10, ge=1, le=100, description="预览行数"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    include_preview: bool = Query(True, description="是否包含数据预览"),
+    preview_rows: int = Query(10, ge=1, le=100, description="预览行数")
 ):
     """
     获取数据集详情
@@ -281,9 +281,9 @@ async def update_dataset(
 @router.delete("/datasets/{dataset_id}", response_model=Dict[str, Any])
 async def delete_dataset(
     dataset_id: str,
-    force: bool = Query(False, description="是否强制删除"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    force: bool = Query(False, description="是否强制删除")
 ):
     """
     删除数据集
@@ -423,10 +423,10 @@ async def get_dataset_quality(
 @router.get("/datasets/{dataset_id}/download")
 async def download_dataset(
     dataset_id: str,
-    format: str = Query("csv", description="下载格式"),
-    include_metadata: bool = Query(False, description="是否包含元数据"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    format: str = Query("csv", description="下载格式"),
+    include_metadata: bool = Query(False, description="是否包含元数据")
 ):
     """
     下载数据集

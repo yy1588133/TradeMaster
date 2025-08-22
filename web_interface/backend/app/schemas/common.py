@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from pydantic import Field, validator
+from pydantic import Field, field_validator
 
 from app.schemas.base import BaseSchema, TimestampSchema, UUIDSchema
 from app.models.database import EvaluationType, EvaluationStatus, LogLevel
@@ -27,7 +27,8 @@ class EvaluationBase(BaseSchema):
     )
     evaluation_type: EvaluationType = Field(..., description="评估类型")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证评估任务名称"""
         if not v or not v.strip():
@@ -44,7 +45,8 @@ class BacktestConfig(BaseSchema):
     transaction_cost: float = Field(0.001, ge=0, le=0.1, description="交易成本比例")
     slippage: float = Field(0.0001, ge=0, le=0.01, description="滑点比例")
     
-    @validator('start_date', 'end_date')
+    @field_validator('start_date', 'end_date')
+    @classmethod
     def validate_date_format(cls, v):
         """验证日期格式"""
         try:
@@ -86,18 +88,23 @@ class EvaluationConfig(BaseSchema):
     performance_config: Optional[PerformanceAnalysisConfig] = Field(None, description="性能分析配置")  
     risk_config: Optional[RiskAnalysisConfig] = Field(None, description="风险分析配置")
     
-    @validator('backtest_config', 'performance_config', 'risk_config')
-    def validate_config_match(cls, v, values, field):
+    @field_validator('backtest_config', 'performance_config', 'risk_config')
+    @classmethod
+    def validate_config_match(cls, v, info):
         """验证配置与评估类型匹配"""
-        evaluation_type = values.get('evaluation_type')
+        if not info.data:
+            return v
+            
+        evaluation_type = info.data.get('evaluation_type')
+        field_name = info.field_name
         
-        if evaluation_type == EvaluationType.BACKTEST and field.name == 'backtest_config':
+        if evaluation_type == EvaluationType.BACKTEST and field_name == 'backtest_config':
             if v is None:
                 raise ValueError('回测评估需要提供backtest_config')
-        elif evaluation_type == EvaluationType.PERFORMANCE and field.name == 'performance_config':
+        elif evaluation_type == EvaluationType.PERFORMANCE and field_name == 'performance_config':
             if v is None:
                 raise ValueError('性能评估需要提供performance_config')
-        elif evaluation_type == EvaluationType.RISK and field.name == 'risk_config':
+        elif evaluation_type == EvaluationType.RISK and field_name == 'risk_config':
             if v is None:
                 raise ValueError('风险评估需要提供risk_config')
         
@@ -244,7 +251,8 @@ class AlertRule(BaseSchema):
     severity: str = Field(..., description="严重级别 (low, medium, high, critical)")
     enabled: bool = Field(True, description="是否启用")
     
-    @validator('operator')
+    @field_validator('operator')
+    @classmethod
     def validate_operator(cls, v):
         """验证比较操作符"""
         allowed_operators = ['>', '<', '>=', '<=', '==', '!=']
@@ -252,7 +260,8 @@ class AlertRule(BaseSchema):
             raise ValueError(f'操作符必须是: {", ".join(allowed_operators)}')
         return v
     
-    @validator('severity')
+    @field_validator('severity')
+    @classmethod
     def validate_severity(cls, v):
         """验证严重级别"""
         allowed_severities = ['low', 'medium', 'high', 'critical']
@@ -343,7 +352,8 @@ class WebSocketEvent(BaseSchema):
     event_id: Optional[str] = Field(None, description="事件ID")
     user_id: Optional[int] = Field(None, description="目标用户ID")
     
-    @validator('timestamp', pre=True, always=True)
+    @field_validator('timestamp', mode='before')
+    @classmethod
     def set_timestamp(cls, v):
         """自动设置时间戳"""
         if v is None:
@@ -356,11 +366,12 @@ class SubscribeRequest(BaseSchema):
     channel: str = Field(..., description="订阅频道")
     filters: Optional[Dict[str, Any]] = Field(None, description="过滤条件")
     
-    @validator('channel')
+    @field_validator('channel')
+    @classmethod
     def validate_channel(cls, v):
         """验证频道名称"""
         allowed_channels = [
-            'training_jobs', 'evaluations', 'strategies', 
+            'training_jobs', 'evaluations', 'strategies',
             'system_alerts', 'notifications', 'global'
         ]
         if v not in allowed_channels:
@@ -381,7 +392,8 @@ class NotificationMessage(BaseSchema):
     category: Optional[str] = Field(None, description="通知分类")
     actions: Optional[List[Dict[str, str]]] = Field(None, description="操作按钮")
     
-    @validator('level')
+    @field_validator('level')
+    @classmethod
     def validate_level(cls, v):
         """验证通知级别"""
         allowed_levels = ['info', 'success', 'warning', 'error']
@@ -399,7 +411,8 @@ class ExportRequest(BaseSchema):
     format: str = Field("json", description="导出格式")
     include_metadata: bool = Field(True, description="是否包含元数据")
     
-    @validator('resource_type')
+    @field_validator('resource_type')
+    @classmethod
     def validate_resource_type(cls, v):
         """验证资源类型"""
         allowed_types = ['strategies', 'datasets', 'training_jobs', 'evaluations']
@@ -407,7 +420,8 @@ class ExportRequest(BaseSchema):
             raise ValueError(f'资源类型必须是: {", ".join(allowed_types)}')
         return v
     
-    @validator('format')
+    @field_validator('format')
+    @classmethod
     def validate_format(cls, v):
         """验证导出格式"""
         allowed_formats = ['json', 'csv', 'xlsx']
@@ -433,7 +447,8 @@ class ImportRequest(BaseSchema):
     conflict_resolution: str = Field("skip", description="冲突解决策略")
     validate_only: bool = Field(False, description="是否仅验证不导入")
     
-    @validator('conflict_resolution')
+    @field_validator('conflict_resolution')
+    @classmethod
     def validate_conflict_resolution(cls, v):
         """验证冲突解决策略"""
         allowed_strategies = ['skip', 'overwrite', 'rename']

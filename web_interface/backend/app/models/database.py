@@ -826,7 +826,7 @@ class SystemLog(Base):
     )
     
     # 额外数据
-    metadata: Mapped[Dict[str, Any]] = mapped_column(
+    extra_metadata: Mapped[Dict[str, Any]] = mapped_column(
         JSONB, default=dict, nullable=False, comment="元数据"
     )
     stack_trace: Mapped[Optional[str]] = mapped_column(

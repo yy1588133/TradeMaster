@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from pydantic import Field, validator, root_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.schemas.base import BaseSchema, TimestampSchema, UUIDSchema
 from app.models.database import DatasetStatus
@@ -69,7 +69,8 @@ class DatasetBase(BaseSchema):
     )
     description: Optional[str] = Field(None, description="数据集描述")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证数据集名称"""
         if not v or not v.strip():
@@ -89,7 +90,8 @@ class DatasetUpdate(BaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="数据集名称")
     description: Optional[str] = Field(None, description="数据集描述")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证数据集名称"""
         if v is not None:
@@ -221,7 +223,8 @@ class FileUploadRequest(BaseSchema):
     name: str = Field(..., min_length=1, max_length=100, description="数据集名称")
     description: Optional[str] = Field(None, description="数据集描述")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         """验证数据集名称"""
         if not v or not v.strip():
@@ -254,7 +257,8 @@ class PreprocessingOperation(BaseSchema):
     columns: Optional[List[str]] = Field(None, description="目标列，None表示所有适用列")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="操作参数")
     
-    @root_validator
+    @model_validator(mode='before')
+    @classmethod
     def validate_operation_parameters(cls, values):
         """验证操作参数"""
         operation_type = values.get('type')
@@ -299,7 +303,8 @@ class PreprocessingRequest(BaseSchema):
     save_as_new: bool = Field(False, description="是否保存为新数据集")
     new_name: Optional[str] = Field(None, description="新数据集名称（save_as_new为True时必需）")
     
-    @root_validator
+    @model_validator(mode='before')
+    @classmethod
     def validate_save_as_new(cls, values):
         """验证保存为新数据集的参数"""
         save_as_new = values.get('save_as_new', False)
@@ -342,7 +347,8 @@ class DatasetListQuery(BaseSchema):
     max_size: Optional[int] = Field(None, ge=0, description="最大文件大小筛选")
     sort: Optional[str] = Field("created_at:desc", description="排序字段")
     
-    @validator('sort')
+    @field_validator('sort')
+    @classmethod
     def validate_sort(cls, v):
         """验证排序参数"""
         if v is None:
@@ -390,7 +396,8 @@ class ColumnAnalysisRequest(BaseSchema):
         description="分析类型列表"
     )
     
-    @validator('analysis_types')
+    @field_validator('analysis_types')
+    @classmethod
     def validate_analysis_types(cls, v):
         """验证分析类型"""
         allowed_types = ['basic', 'distribution', 'correlation', 'outliers', 'missing_pattern']

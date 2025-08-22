@@ -112,10 +112,10 @@ async def run_backtest(
 @router.get("/backtest/{backtest_id}", response_model=Dict[str, Any])
 async def get_backtest_results(
     backtest_id: str,
-    include_trades: bool = Query(True, description="是否包含交易记录"),
-    include_charts: bool = Query(True, description="是否包含图表"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    include_trades: bool = Query(True, description="是否包含交易记录"),
+    include_charts: bool = Query(True, description="是否包含图表")
 ):
     """
     获取回测结果
@@ -144,14 +144,14 @@ async def get_backtest_results(
 
 @router.get("/backtests", response_model=Dict[str, Any])
 async def list_backtests(
+    current_user: CurrentUser,
+    db: DatabaseSession,
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     strategy_id: Optional[str] = Query(None, description="策略ID筛选"),
     status: Optional[str] = Query(None, description="状态筛选"),
     sort_by: str = Query("created_at", description="排序字段"),
-    sort_order: str = Query("desc", description="排序方向"),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    sort_order: str = Query("desc", description="排序方向")
 ):
     """
     获取回测列表
@@ -400,9 +400,9 @@ async def get_comparison_analysis_results(
 
 @router.get("/metrics/available", response_model=Dict[str, Any])
 async def get_available_metrics(
-    category: Optional[str] = Query(None, description="指标分类"),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    category: Optional[str] = Query(None, description="指标分类")
 ):
     """
     获取可用的分析指标列表
@@ -426,11 +426,11 @@ async def get_available_metrics(
 
 @router.post("/metrics/calculate", response_model=Dict[str, Any])
 async def calculate_metrics(
+    current_user: CurrentUser,
+    db: DatabaseSession,
     strategy_id: str = Body(..., description="策略ID"),
     metrics: List[str] = Body(..., description="指标列表"),
-    time_range: str = Body("1y", description="计算时间范围"),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    time_range: str = Body("1y", description="计算时间范围")
 ):
     """
     计算指定指标
@@ -463,11 +463,11 @@ async def calculate_metrics(
 
 @router.post("/reports/generate", response_model=Dict[str, Any])
 async def generate_analysis_report(
+    current_user: CurrentUser,
+    db: DatabaseSession,
     analysis_ids: List[str] = Body(..., description="分析ID列表"),
     report_config: Dict[str, Any] = Body({}, description="报告配置"),
-    format: str = Body("pdf", description="报告格式"),
-    current_user: CurrentUser,
-    db: DatabaseSession
+    format: str = Body("pdf", description="报告格式")
 ):
     """
     生成分析报告

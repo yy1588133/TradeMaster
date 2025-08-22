@@ -474,9 +474,9 @@ async def get_strategy_status(
 async def get_strategy_logs(
     strategy_id: str,
     current_user: CurrentUser,
+    db: DatabaseSession,
     limit: int = Query(100, description="日志条数限制"),
-    level: Optional[str] = Query(None, description="日志级别过滤"),
-    db: DatabaseSession
+    level: Optional[str] = Query(None, description="日志级别过滤")
 ) -> Dict[str, Any]:
     """获取策略执行日志
     
@@ -526,9 +526,9 @@ async def get_strategy_logs(
 @router.post("/{strategy_id}/clone", response_model=StrategyResponse, summary="克隆策略")
 async def clone_strategy(
     strategy_id: str,
-    clone_name: str = Body(..., embed=True),
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    clone_name: str = Body(..., embed=True)
 ) -> StrategyResponse:
     """克隆策略
     
@@ -568,8 +568,8 @@ async def clone_strategy(
 
 @router.get("/templates", response_model=List[StrategyTemplateResponse], summary="获取策略模板列表")
 async def get_strategy_templates(
-    strategy_type: Optional[StrategyType] = Query(None, description="按策略类型过滤"),
-    current_user: CurrentUser = Depends(get_current_active_user)
+    current_user: CurrentUser,
+    strategy_type: Optional[StrategyType] = Query(None, description="按策略类型过滤")
 ) -> List[StrategyTemplateResponse]:
     """获取策略模板列表
     

@@ -9,8 +9,9 @@ import os
 from typing import Any, Dict, List, Optional, Union
 from functools import lru_cache
 
-from pydantic import BaseSettings, PostgresDsn, validator, HttpUrl, Field
+from pydantic import PostgresDsn, HttpUrl, Field, field_validator
 from pydantic.networks import AnyHttpUrl
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -30,21 +31,55 @@ class Settings(BaseSettings):
     SERVER_HOST: str = Field(default="0.0.0.0", description="服务器绑定地址")
     SERVER_PORT: int = Field(default=8000, description="服务器端口")
     
-    # CORS配置
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = Field(
-        default=["http://localhost:3000", "http://localhost:8080"],
-        description="允许的CORS源地址列表"
-    )
+    # CORS配置 - 使用property避免Pydantic解析问题
+    @property
+    def BACKEND_CORS_ORIGINS(self) -> List[str]:
+        """获取CORS源地址列表"""
+        return self._parse_cors_origins_safely()
     
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
-        """解析CORS源地址"""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(f"无效的CORS配置: {v}")
-    
+    @staticmethod
+    def _parse_cors_origins_safely() -> List[str]:
+        """安全地解析CORS源地址列表
+        
+        直接从环境变量读取，避免Pydantic的自动解析问题
+        """
+        import json
+        
+        # 直接从环境变量获取
+        cors_env = os.environ.get('BACKEND_CORS_ORIGINS', '')
+        
+        if not cors_env or cors_env.strip() == '':
+            # 返回默认值
+            return [
+                "http://localhost:3000",
+                "http://localhost:8080",
+                "http://localhost:3100",
+                "http://127.0.0.1:3100"
+            ]
+        
+        # 尝试JSON解析
+        try:
+            parsed = json.loads(cors_env)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except (json.JSONDecodeError, ValueError):
+            pass
+        
+        # 尝试逗号分隔解析
+        if ',' in cors_env:
+            return [origin.strip() for origin in cors_env.split(',') if origin.strip()]
+        
+        # 单个URL
+        if cors_env.strip():
+            return [cors_env.strip()]
+        
+        # 如果所有解析都失败，返回默认值
+        return [
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "http://localhost:3100",
+            "http://127.0.0.1:3100"
+        ]
     # 信任主机配置
     ALLOWED_HOSTS: List[str] = Field(
         default=["localhost", "127.0.0.1", "0.0.0.0"],
@@ -79,17 +114,21 @@ class Settings(BaseSettings):
     
     DATABASE_URL: Optional[PostgresDsn] = None
     
-    @validator("DATABASE_URL", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: Optional[str], info) -> Any:
         """构建数据库连接URL"""
         if isinstance(v, str):
             return v
+        
+        # 在Pydantic v2中，需要从info.data获取其他字段值
+        values = info.data if hasattr(info, 'data') else {}
         return PostgresDsn.build(
             scheme="postgresql+asyncpg",
-            user=values.get("POSTGRES_USER"),
+            username=values.get("POSTGRES_USER"),
             password=values.get("POSTGRES_PASSWORD"),
             host=values.get("POSTGRES_SERVER"),
-            port=values.get("POSTGRES_PORT"),
+            port=int(values.get("POSTGRES_PORT", "5432")),
             path=f"/{values.get('POSTGRES_DB') or ''}",
         )
     
