@@ -1,7 +1,7 @@
 {
   "// ==================== TradeMaster Web Interface VS Code 配置 ====================": "",
   "// 全局设置": "",
-  
+
   "// ==================== 编辑器配置 ====================": "",
   "editor.formatOnSave": true,
   "editor.formatOnType": false,
@@ -23,7 +23,7 @@
   "editor.minimap.maxColumn": 120,
   "editor.wordWrap": "bounded",
   "editor.wordWrapColumn": 120,
-  
+
   "// ==================== 文件配置 ====================": "",
   "files.associations": {
     "*.env.*": "dotenv",
@@ -70,12 +70,12 @@
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
-  
+
   "// ==================== Python 配置 ====================": "",
   "python.defaultInterpreterPath": "./web_interface/backend/venv/bin/python",
   "python.terminal.activateEnvironment": true,
   "python.terminal.activateEnvInCurrentTerminal": true,
-  
+
   "// Python 格式化": "",
   "python.formatting.provider": "none",
   "[python]": {
@@ -87,28 +87,28 @@
     "editor.tabSize": 4,
     "editor.insertSpaces": true
   },
-  
+
   "// Black 格式化配置": "",
   "black-formatter.args": [
     "--line-length=88",
     "--target-version=py39"
   ],
-  
+
   "// isort 配置": "",
   "isort.args": [
     "--profile=black"
   ],
-  
+
   "// Pylint 配置": "",
   "pylint.args": [
     "--load-plugins=pylint_django"
   ],
-  
+
   "// MyPy 配置": "",
   "mypy-type-checker.args": [
     "--config-file=pyproject.toml"
   ],
-  
+
   "// ==================== JavaScript/TypeScript 配置 ====================": "",
   "typescript.preferences.importModuleSpecifier": "relative",
   "typescript.preferences.includePackageJsonAutoImports": "auto",
@@ -127,7 +127,7 @@
   "typescript.format.insertSpaceAfterOpeningAndBeforeClosingJsxExpressionBraces": false,
   "typescript.format.placeOpenBraceOnNewLineForFunctions": false,
   "typescript.format.placeOpenBraceOnNewLineForControlBlocks": false,
-  
+
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -136,7 +136,7 @@
       "source.fixAll.eslint": "explicit"
     }
   },
-  
+
   "[javascriptreact]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -145,7 +145,7 @@
       "source.fixAll.eslint": "explicit"
     }
   },
-  
+
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -154,7 +154,7 @@
       "source.fixAll.eslint": "explicit"
     }
   },
-  
+
   "[typescriptreact]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -163,7 +163,7 @@
       "source.fixAll.eslint": "explicit"
     }
   },
-  
+
   "// ==================== ESLint 配置 ====================": "",
   "eslint.workingDirectories": [
     "web_interface/frontend"
@@ -178,37 +178,37 @@
   "eslint.codeAction.showDocumentation": {
     "enable": true
   },
-  
+
   "// ==================== Prettier 配置 ====================": "",
   "prettier.configPath": "./web_interface/frontend/.prettierrc",
   "prettier.ignorePath": "./web_interface/frontend/.prettierignore",
   "prettier.requireConfig": true,
-  
+
   "// ==================== JSON/YAML 配置 ====================": "",
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  
+
   "[jsonc]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  
+
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml",
     "editor.formatOnSave": true,
     "editor.tabSize": 2,
     "editor.insertSpaces": true
   },
-  
+
   "[yml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml",
     "editor.formatOnSave": true,
     "editor.tabSize": 2,
     "editor.insertSpaces": true
   },
-  
+
   "// ==================== 其他格式配置 ====================": "",
   "[markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -220,43 +220,43 @@
       "other": "off"
     }
   },
-  
+
   "[html]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  
+
   "[css]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  
+
   "[less]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  
+
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-docker",
     "editor.formatOnSave": true
   },
-  
+
   "[dockercompose]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-docker",
     "editor.formatOnSave": true
   },
-  
+
   "[shellscript]": {
     "editor.defaultFormatter": "foxundermoon.shell-format",
     "editor.formatOnSave": true,
     "editor.tabSize": 2
   },
-  
+
   "[makefile]": {
     "editor.insertSpaces": false,
     "editor.detectIndentation": false
   },
-  
+
   "// ==================== 终端配置 ====================": "",
   "terminal.integrated.defaultProfile.windows": "PowerShell",
   "terminal.integrated.profiles.windows": {
@@ -277,7 +277,7 @@
   "terminal.integrated.cwd": "${workspaceFolder}",
   "terminal.integrated.fontSize": 14,
   "terminal.integrated.fontFamily": "Consolas, 'Courier New', monospace",
-  
+
   "// ==================== Git 配置 ====================": "",
   "git.enableSmartCommit": true,
   "git.confirmSync": false,
@@ -286,7 +286,7 @@
   "git.showPushSuccessNotification": true,
   "git.decorations.enabled": true,
   "git.ignoreMissingGitWarning": false,
-  
+
   "// ==================== 搜索配置 ====================": "",
   "search.exclude": {
     "**/node_modules": true,
@@ -306,31 +306,31 @@
   "search.smartCase": true,
   "search.useIgnoreFiles": true,
   "search.useGlobalIgnoreFiles": true,
-  
+
   "// ==================== 调试配置 ====================": "",
   "debug.allowBreakpointsEverywhere": true,
   "debug.inlineValues": "auto",
   "debug.showBreakpointsInOverviewRuler": true,
-  
+
   "// ==================== 扩展配置 ====================": "",
   "extensions.ignoreRecommendations": false,
-  
+
   "// ==================== 智能感知配置 ====================": "",
   "intelliSense.completionItemProviders": [
     "ms-python.python",
     "ms-vscode.vscode-typescript-next",
     "bradlc.vscode-tailwindcss"
   ],
-  
+
   "// ==================== 工作区配置 ====================": "",
-  "workbench.colorTheme": "Default Dark+",
+  "workbench.colorTheme": "Default Light Modern",
   "workbench.iconTheme": "vs-seti",
   "workbench.editor.enablePreview": false,
   "workbench.editor.closeEmptyGroups": false,
   "workbench.startupEditor": "readme",
   "workbench.tree.indent": 20,
   "workbench.tree.renderIndentGuides": "always",
-  
+
   "// ==================== 资源管理器配置 ====================": "",
   "explorer.confirmDelete": true,
   "explorer.confirmDragAndDrop": true,
@@ -350,17 +350,17 @@
     ".prettierrc.*": ".prettierignore",
     "vitest.config.*": "vitest.*.config.*"
   },
-  
+
   "// ==================== 性能配置 ====================": "",
   "typescript.disableAutomaticTypeAcquisition": false,
   "typescript.maxTsServerMemory": 4096,
   "python.analysis.memory.keepLibraryAst": true,
-  
+
   "// ==================== 安全配置 ====================": "",
   "security.workspace.trust.untrustedFiles": "prompt",
   "security.workspace.trust.banner": "always",
   "security.workspace.trust.startupPrompt": "always",
-  
+
   "// ==================== 其他配置 ====================": "",
   "emmet.includeLanguages": {
     "javascript": "javascriptreact",

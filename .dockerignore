@@ -49,7 +49,7 @@ venv.bak/
 docs/
 *.md
 *.rst
-# *.txt  # 注释掉这行，允许requirements文件
+# *.txt
 !requirements.txt
 !requirements-docker.txt
 
@@ -90,3 +90,35 @@ setup.cfg
 # Any backup files
 *.bak
 *.backup
+
+# ==================== Frontend specific ====================
+# Node.js dependencies
+web_interface/frontend/node_modules/
+web_interface/frontend/.pnpm-store/
+web_interface/frontend/package-lock.json
+web_interface/frontend/pnpm-lock.yaml
+web_interface/frontend/yarn.lock
+
+# Frontend build outputs
+web_interface/frontend/dist/
+web_interface/frontend/build/
+web_interface/frontend/.vite/
+web_interface/frontend/.cache/
+
+# Frontend development files
+web_interface/frontend/.env.development
+web_interface/frontend/.env.local
+web_interface/frontend/.eslintcache
+web_interface/frontend/.prettierrc
+web_interface/frontend/coverage/
+web_interface/frontend/reports/
+
+# Test and dev files
+web_interface/frontend/src/test/
+web_interface/frontend/**/*.test.ts
+web_interface/frontend/**/*.test.tsx
+web_interface/frontend/**/*.spec.ts
+web_interface/frontend/**/*.spec.tsx
+
+# Keep production config template
+!web_interface/frontend/.env.production.template
