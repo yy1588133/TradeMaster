@@ -28,7 +28,7 @@ import {
   SettingOutlined,
   KeyOutlined,
   BellOutlined,
-  ShieldOutlined,
+  SafetyOutlined,
   EyeOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
@@ -404,7 +404,7 @@ const Profile: React.FC = () => {
                 </Form>
               </TabPane>
 
-              <TabPane tab={<span><ShieldOutlined />API密钥</span>} key="api">
+              <TabPane tab={<span><SafetyOutlined />API密钥</span>} key="api">
                 <div style={{ marginBottom: 16 }}>
                   <Button type="primary" icon={<KeyOutlined />}>
                     创建API密钥

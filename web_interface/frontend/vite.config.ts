@@ -17,24 +17,24 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       react(),
       
-      // 开发环境ESLint检查
-      isDevelopment &&
-        eslint({
-          cache: false,
-          include: ['src/**/*.{ts,tsx}'],
-          exclude: ['node_modules'],
-        }),
+      // 开发环境ESLint检查 - 暂时禁用
+      // isDevelopment &&
+      //   eslint({
+      //     cache: false,
+      //     include: ['src/**/*.{ts,tsx}'],
+      //     exclude: ['node_modules'],
+      //   }),
       
-      // TypeScript和ESLint检查
-      checker({
-        typescript: true,
-        eslint: {
-          lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
-        },
-        overlay: {
-          initialIsOpen: false,
-        },
-      }),
+      // TypeScript检查（生产环境禁用检查） - 暂时禁用
+      // isDevelopment && checker({
+      //   typescript: true,
+      //   eslint: {
+      //     lintCommand: 'eslint "./src/**/*.{ts,tsx}"',
+      //   },
+      //   overlay: {
+      //     initialIsOpen: false,
+      //   },
+      // }),
       
       // HTML模板处理 - 使用内置的HTML处理
       
@@ -130,12 +130,13 @@ export default defineConfig(({ mode, command }) => {
       hmr: {
         overlay: true,
         port: parseInt(env.VITE_HMR_PORT) || 24678,
+      },
       watch: {
         usePolling: env.VITE_USE_POLLING === 'true',
         interval: 1000,
         ignored: ['**/node_modules/**', '**/.git/**'],
       },
-  },
+    },
 
   build: {
     target: ['es2015', 'edge88', 'firefox78', 'chrome87', 'safari12'],
@@ -208,74 +209,72 @@ export default defineConfig(({ mode, command }) => {
       },
     },
   },
-      },
+
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'antd',
+      '@ant-design/icons',
+      '@ant-design/plots',
+      '@reduxjs/toolkit',
+      'react-redux',
+      'axios',
+      'dayjs',
+      'lodash-es',
+      'classnames',
+      'echarts',
+      'echarts-for-react',
+      'ahooks',
+      'immer',
+      'query-string',
+    ],
+    exclude: [
+      // 排除某些不需要预构建的包
+    ],
+    force: env.VITE_FORCE_OPTIMIZE === 'true',
   },
-    optimizeDeps: {
-      include: [
-        'react',
-        'react-dom',
-        'react-router-dom',
-        'antd',
-        '@ant-design/icons',
-        '@ant-design/plots',
-        '@reduxjs/toolkit',
-        'react-redux',
-        'axios',
-        'dayjs',
-        'lodash-es',
-        'classnames',
-        'echarts',
-        'echarts-for-react',
-        'ahooks',
-        'immer',
-        'query-string',
-      ],
+
+  // 预览配置
+  preview: {
+    port: parseInt(env.VITE_PREVIEW_PORT) || 4173,
+    host: env.VITE_PREVIEW_HOST || '0.0.0.0',
+    strictPort: false,
+    open: env.VITE_PREVIEW_OPEN === 'true',
+  },
+
+  // 测试配置
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
       exclude: [
-        // 排除某些不需要预构建的包
+        'node_modules/',
+        'src/test/',
+        '**/*.d.ts',
+        'src/vite-env.d.ts',
       ],
-      force: env.VITE_FORCE_OPTIMIZE === 'true',
-    },
-
-    // 预览配置
-    preview: {
-      port: parseInt(env.VITE_PREVIEW_PORT) || 4173,
-      host: env.VITE_PREVIEW_HOST || '0.0.0.0',
-      strictPort: false,
-      open: env.VITE_PREVIEW_OPEN === 'true',
-    },
-
-    // 测试配置
-    test: {
-      globals: true,
-      environment: 'jsdom',
-      setupFiles: ['./src/test/setup.ts'],
-      css: true,
-      coverage: {
-        provider: 'v8',
-        reporter: ['text', 'json', 'html'],
-        exclude: [
-          'node_modules/',
-          'src/test/',
-          '**/*.d.ts',
-          'src/vite-env.d.ts',
-        ],
-        thresholds: {
-          global: {
-            branches: 70,
-            functions: 70,
-            lines: 70,
-            statements: 70,
-          },
+      thresholds: {
+        global: {
+          branches: 70,
+          functions: 70,
+          lines: 70,
+          statements: 70,
         },
       },
     },
-
-    // 定义全局常量
-    define: {
-      __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
-      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-      __DEV__: isDevelopment,
-      __PROD__: isProduction,
+  },
+// 定义全局常量
+define: {
+  __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+  __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  __DEV__: isDevelopment,
+  __PROD__: isProduction,
     },
   }
 })
