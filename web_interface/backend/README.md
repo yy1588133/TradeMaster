@@ -67,10 +67,11 @@ backend/
 ## 🛠️ 安装和运行
 
 ### 环境要求
-- Python 3.8+
+- Python 3.11+
 - PostgreSQL 13+
 - Redis 6+
 - TradeMaster系统 (运行在端口8080)
+- **推荐**: uv包管理器 (现代化Python依赖管理)
 
 ### 1. 克隆项目
 ```bash
@@ -78,19 +79,46 @@ cd web_interface/backend
 ```
 
 ### 2. 安装依赖
+
+#### 方案一：使用uv (推荐)
+uv是现代化的Python包管理器，具有更快的安装速度和更智能的依赖解析能力。
+
 ```bash
-# 创建虚拟环境
-python -m venv venv
+# 安装uv (如果尚未安装)
+# Windows (PowerShell):
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# macOS/Linux:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 使用uv创建虚拟环境
+uv venv .venv
 
 # 激活虚拟环境
 # Linux/macOS:
-source venv/bin/activate
+source .venv/bin/activate
 # Windows:
-venv\Scripts\activate
+.venv\Scripts\activate
+
+# 使用uv安装依赖 (比pip快10倍+)
+uv pip install -r requirements.txt
+```
+
+#### 方案二：使用pip (传统方式)
+```bash
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活虚拟环境
+# Linux/macOS:
+source .venv/bin/activate
+# Windows:
+.venv\Scripts\activate
 
 # 安装依赖
 pip install -r requirements.txt
 ```
+
+**注意**: requirements.txt包含完整的ML依赖栈(PyTorch, TensorFlow, mmcv等)，推荐使用uv避免依赖冲突问题。
 
 ### 3. 配置环境变量
 ```bash
@@ -298,6 +326,7 @@ curl http://localhost:8000/api/v1/status
 - 使用isort进行导入排序
 - 使用Flake8进行代码检查
 - 使用MyPy进行类型检查
+- **推荐使用uv进行依赖管理** - 更快、更智能的包管理
 
 ### 提交规范
 ```bash
@@ -314,6 +343,32 @@ pre-commit run --all-files
 3. 在`app/schemas/`中定义数据模式
 4. 在`app/models/`中添加数据库模型 (如需要)
 5. 编写测试并更新文档
+
+### 依赖管理最佳实践
+
+#### 添加新依赖
+```bash
+# 使用uv添加新包 (推荐)
+uv pip install package_name
+
+# 更新requirements.txt
+uv pip freeze > requirements.txt
+
+# 或使用pip
+pip install package_name
+pip freeze > requirements.txt
+```
+
+#### 依赖版本管理
+- **生产环境**: 使用固定版本 (如 `fastapi==0.104.1`)
+- **开发环境**: 可使用版本范围 (如 `fastapi>=0.104.0`)
+- **关键ML库**: 谨慎升级，注意兼容性
+
+#### uv的优势
+- **速度**: 比pip快10-100倍的安装速度
+- **智能解析**: 自动解决依赖冲突
+- **并行下载**: 支持多线程下载
+- **缓存优化**: 智能缓存机制
 
 ## 🔗 集成说明
 

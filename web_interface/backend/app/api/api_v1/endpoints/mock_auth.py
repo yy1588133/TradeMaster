@@ -71,17 +71,29 @@ async def login():
     """用户登录"""
     user_data = {
         "id": "mock_user_1",
+        "uuid": "mock-uuid-123",
         "username": "demo_user",
         "email": "demo@example.com",
-        "role": "admin"
+        "full_name": "Demo User",
+        "role": "admin",
+        "is_active": True,
+        "is_verified": True,
+        "created_at": "2023-01-01T00:00:00Z",
+        "last_login_at": datetime.now().isoformat() + "Z",
+        "login_count": 1
     }
     
+    access_token = create_access_token(user_data)
+    
     return {
-        "message": "登录成功",
         "user": user_data,
-        "access_token": create_access_token(user_data),
-        "token_type": "bearer",
-        "expires_in": 3600
+        "tokens": {
+            "access_token": access_token,
+            "refresh_token": "mock_refresh_token_" + str(int(time.time())),
+            "token_type": "bearer",
+            "expires_in": 3600
+        },
+        "message": "登录成功"
     }
 
 @router.get("/me")

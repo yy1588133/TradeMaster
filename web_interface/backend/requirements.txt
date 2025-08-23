@@ -1,6 +1,6 @@
-# ==================== TradeMaster Web Interface Backend 依赖配置 ====================
-# Web界面后端服务的完整依赖列表
-# 与TradeMaster核心保持版本兼容
+# ==================== TradeMaster Web Interface Backend 完整依赖配置 ====================
+# 统一的依赖文件，包含生产和开发环境所有必需依赖
+# 与TradeMaster核心保持版本兼容，Python 3.12优化
 
 # ==================== 核心框架 ====================
 fastapi==0.104.1
@@ -12,7 +12,7 @@ python-multipart==0.0.6
 sqlalchemy==2.0.23
 asyncpg==0.29.0
 alembic==1.12.1
-# 移除psycopg2-binary以避免与asyncpg冲突
+# 注释psycopg2-binary以避免与asyncpg冲突
 # psycopg2-binary==2.9.9
 
 # ==================== 缓存和队列 ====================
@@ -38,15 +38,16 @@ aiofiles==23.2.1
 
 # ==================== 配置管理 ====================
 python-decouple==3.8
+python-dotenv==1.0.0
 
 # ==================== 日志系统 ====================
 loguru==0.7.2
 structlog==23.2.0
 
 # ==================== 数据处理 ====================
-# 与TradeMaster核心保持numpy版本兼容(TensorFlow 2.11.0要求)
+# Python 3.12兼容版本 - 使用预编译wheels
 pandas==2.1.4
-numpy==1.23.5
+numpy>=1.24.0
 openpyxl==3.1.2
 
 # ==================== 工具库 ====================
@@ -54,19 +55,83 @@ click==8.1.7
 typer==0.9.0
 rich==13.7.0
 python-dateutil==2.8.2
+colorama==0.4.6
+tqdm==4.66.1
 
 # ==================== 监控和调试 ====================
 prometheus-client==0.19.0
 sentry-sdk[fastapi]==1.38.0
+psutil==5.9.6
 
 # ==================== 部署相关 ====================
 gunicorn==21.2.0
 
 # ==================== TradeMaster集成依赖 ====================
 # 为了与TradeMaster核心集成，需要包含关键的ML依赖
-# 修复Python 3.11兼容性问题
-tensorflow==2.12.0
-scipy==1.10.1
+# Python 3.11+兼容版本，建议使用uv包管理器安装
+torch>=2.8.0
+tensorflow>=2.20.0
+scipy==1.11.4
 scikit-learn==1.3.2
-matplotlib==3.7.5
+matplotlib>=3.10.0
 plotly==5.17.0
+mmengine>=0.10.7
+mmcv>=2.2.0
+opencv-python>=4.11.0,<4.12
+
+# ==================== 开发工具依赖 ====================
+# 测试框架
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist==3.5.0
+pytest-benchmark==4.0.0
+
+# 代码质量工具
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+pylint==3.0.3
+bandit==1.7.5
+
+# 类型检查
+mypy==1.7.1
+types-redis==4.6.0.11
+types-python-dateutil==2.8.19.14
+
+# Git钩子和预提交
+pre-commit==3.6.0
+
+# 测试数据生成
+factory-boy==3.3.0
+faker==20.1.0
+hypothesis==6.92.1
+
+# 调试和分析工具
+ipdb==0.13.13
+memory-profiler==0.61.0
+line-profiler==4.1.1
+py-spy==0.3.14
+
+# API文档和开发工具
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+httpie==3.2.2
+
+# SQLAlchemy开发支持
+sqlalchemy-stubs==0.4
+
+# 异步开发工具
+asyncio-mqtt==0.16.1
+
+# 开发服务器和热重载
+watchfiles==0.21.0
+
+# 性能监控
+py-cpuinfo==9.0.0
+
+# Jupyter和交互式开发
+jupyter==1.0.0
+ipython==8.18.1
+notebook==7.0.6

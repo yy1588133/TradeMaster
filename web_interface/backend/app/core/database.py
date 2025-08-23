@@ -69,8 +69,7 @@ def create_database_engine() -> AsyncEngine:
     # 创建引擎
     engine = create_async_engine(
         database_url,
-        # 连接池配置
-        poolclass=poolclass,
+        # 连接池配置 (异步引擎自动选择合适的连接池)
         pool_size=pool_size,
         max_overflow=max_overflow,
         pool_timeout=pool_timeout,
