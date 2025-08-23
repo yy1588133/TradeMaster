@@ -14,8 +14,46 @@ import {
 export const authService = {
   // User login
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials)
-    return response.data
+    try {
+      const response = await apiClient.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, credentials)
+      
+      // Validate response data structure
+      if (!response.data) {
+        throw new Error('无效的响应数据')
+      }
+      
+      const { user, tokens } = response.data
+      if (!user || !tokens) {
+        throw new Error('响应数据格式错误：缺少用户信息或令牌')
+      }
+      
+      if (!tokens.access_token || !tokens.refresh_token) {
+        throw new Error('响应数据格式错误：缺少访问令牌或刷新令牌')
+      }
+      
+      return response.data
+    } catch (error: any) {
+      // Enhanced error handling
+      if (error.response) {
+        // Server responded with error status
+        const status = error.response.status
+        const data = error.response.data
+        
+        if (status === 404) {
+          throw new Error('登录接口不存在，请检查服务器配置')
+        } else if (status === 401) {
+          throw new Error(data?.detail || '用户名或密码错误')
+        } else if (status >= 500) {
+          throw new Error('服务器错误，请稍后重试')
+        }
+      } else if (error.request) {
+        // Network error
+        throw new Error('网络连接失败，请检查网络连接')
+      }
+      
+      // Re-throw the error with original message if it's a validation error
+      throw error
+    }
   },
 
   // User logout

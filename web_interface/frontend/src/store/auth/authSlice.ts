@@ -12,6 +12,15 @@ export const loginAsync = createAsyncThunk(
     try {
       const response = await authService.login(credentials)
       
+      // Additional validation to prevent runtime errors
+      if (!response || !response.tokens || !response.user) {
+        throw new Error('登录响应数据不完整')
+      }
+      
+      if (!response.tokens.access_token || !response.tokens.refresh_token) {
+        throw new Error('令牌数据不完整')
+      }
+      
       // Store tokens
       token.set(response.tokens.access_token)
       token.setRefresh(response.tokens.refresh_token)
@@ -21,6 +30,7 @@ export const loginAsync = createAsyncThunk(
       
       return response
     } catch (error: any) {
+      console.error('Login error:', error)
       return rejectWithValue(error.response?.data?.detail || error.message || '登录失败')
     }
   }
