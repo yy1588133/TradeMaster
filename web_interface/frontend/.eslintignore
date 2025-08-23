@@ -1,0 +1,52 @@
+# Build outputs
+dist/
+build/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Generated files
+*.d.ts
+!src/**/*.d.ts
+
+# Config files
+.eslintrc.cjs
+vite.config.ts
+vitest.config.ts
+tsconfig.json
+tsconfig.node.json
+
+# Test files
+**/__tests__/**
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Environment files
+.env*
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+.eslintcache
+.vite/
+
+# Static assets
+public/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
