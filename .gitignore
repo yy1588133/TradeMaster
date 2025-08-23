@@ -15,5 +15,5 @@ web_interface/docker/volumes/postgres_dev/base/
 web_interface/docker/volumes/postgres_dev/global
 web_interface/frontend/node_modules/
 .bmad-core/
-.claude/
 web_interface/backend/venv/
+**/__pycache__/
