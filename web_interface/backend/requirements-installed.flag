@@ -1,0 +1,6 @@
+Installation completed at: 2025-08-23 22:23:00
+Python version: 3.11.11
+Package manager: uv 0.6.14
+Requirements installed: requirements.txt (完整ML依赖栈)
+Total packages: 274 (包含PyTorch, TensorFlow, mmcv, mmengine等)
+Status: SUCCESS - 所有依赖冲突已解决
