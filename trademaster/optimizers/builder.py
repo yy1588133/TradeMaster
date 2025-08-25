@@ -1,5 +1,5 @@
 from trademaster.utils import build_from_cfg
-from mmcv.utils import Registry
+from mmcv.utils.registry import Registry
 import copy
 
 OPTIMIZERS = Registry('optimizer')

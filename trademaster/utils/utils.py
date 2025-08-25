@@ -1,11 +1,11 @@
 import inspect
 import os
 import re
+import logging
 
 import mmcv
 from mmcv import Config
-from mmcv.utils import Registry
-from mmcv.utils import print_log
+from mmcv.utils.registry import Registry
 import numpy as np
 import prettytable
 import random
@@ -18,6 +18,14 @@ from argparse import Namespace
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 import pandas as pd
+
+# 替代print_log函数
+def print_log(msg, logger=None, level=logging.INFO):
+    """Print a log message."""
+    if logger is None:
+        print(msg)
+    else:
+        logger.log(level, msg)
 
 def set_seed(random_seed):
     random.seed(random_seed)
