@@ -68,6 +68,27 @@ cd trademaster-web-interface
 make setup
 ```
 
+### 🚀 PowerShell 智能启动 (Windows推荐)
+
+```powershell
+# 进入Web界面目录
+cd web_interface
+
+# 一键智能启动 (自动检测最佳部署方案)
+.\quick-start.ps1
+
+# 高级用法
+.\quick-start.ps1 -DeployScheme full-docker -VerboseMode  # Docker部署+详细模式
+.\quick-start.ps1 -DeployScheme auto -Force              # 自动检测+跳过确认
+.\quick-start.ps1 -SkipHealthCheck                       # 跳过健康检查
+
+# 支持的部署方案:
+# - full-docker: 完整容器化部署 (推荐)
+# - docker-db:   混合部署 (数据库容器化)
+# - native:      Windows原生服务
+# - auto:        智能自动检测
+```
+
 ### 🏃‍♂️ 启动开发服务
 
 ```bash
@@ -203,16 +224,16 @@ make docker-push        # 推送Docker镜像
 #### 后端环境变量
 
 ```bash
-# 数据库配置
+# 数据库配置 - 使用非常用端口避免冲突
 POSTGRES_SERVER=localhost
-POSTGRES_PORT=5432
+POSTGRES_PORT=15432
 POSTGRES_USER=trademaster
 POSTGRES_PASSWORD=your_password
 POSTGRES_DB=trademaster
 
-# Redis配置（可选）
+# Redis配置（可选）- 使用非常用端口避免冲突
 REDIS_HOST=localhost
-REDIS_PORT=6379
+REDIS_PORT=16379
 
 # JWT配置
 SECRET_KEY=your-secret-key
