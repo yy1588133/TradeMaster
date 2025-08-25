@@ -17,3 +17,5 @@ web_interface/frontend/node_modules/
 .bmad-core/
 web_interface/backend/venv/
 **/__pycache__/
+web_interface/data/postgresql/pgdata/
+web_interface/data/postgresql/pgdata/
