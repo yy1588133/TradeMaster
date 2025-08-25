@@ -10,6 +10,7 @@ from datetime import timedelta
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +39,23 @@ from app.schemas.user import UserResponse
 
 
 router = APIRouter()
+
+
+# ==================== CORS 预检处理 ====================
+
+@router.options("/{path:path}")
+async def handle_options(request: Request):
+    """处理所有OPTIONS预检请求"""
+    return JSONResponse(
+        status_code=200,
+        content={"message": "OK"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true"
+        }
+    )
 
 
 # ==================== 请求模型 ====================

@@ -1,9 +1,10 @@
 # ==================== 多阶段构建配置 ====================
 # 构建阶段：安装依赖和编译代码
-FROM python:3.11-slim-bullseye as builder
+# 使用官方Python镜像 - 如果国内源失败则回退到官方源
+FROM python:3.11-slim AS builder
 
 # 设置构建参数
-ARG PIP_INDEX_URL=https://pypi.org/simple/
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 ARG BUILD_ENV=production
 
 # 设置环境变量
@@ -13,34 +14,45 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # 安装系统依赖（构建时需要）
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 现代Debian系统APT源配置
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends --fix-broken \
     build-essential \
     libpq-dev \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
+# 安装uv包管理器 - 快速现代化Python包管理
+RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple/ uv==0.6.14
+
 # 创建应用用户和目录
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # 复制依赖文件
-COPY backend/requirements.txt .
+COPY backend/requirements-docker.txt ./requirements.txt
 
-# 安装Python依赖到用户目录
-RUN pip install --user --no-cache-dir -r requirements.txt
+# 使用uv创建虚拟环境并安装依赖 - 10倍速度提升
+RUN uv venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+# 设置更长的超时时间
+ENV UV_HTTP_TIMEOUT=120
+RUN uv pip install --no-cache-dir -r requirements.txt --python=/app/.venv/bin/python --index-url https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # ==================== 运行阶段：最小化生产镜像 ====================
-FROM python:3.11-slim-bullseye as production
+FROM python:3.11-slim AS production
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/home/appuser/.local/bin:$PATH \
+    PATH=/app/.venv/bin:$PATH \
     PYTHONPATH=/app
 
 # 安装运行时依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 现代Debian系统APT源配置
+RUN apt-get update --fix-missing && \
+    apt-get install -y --no-install-recommends --fix-broken \
     libpq5 \
     curl \
     netcat-traditional \
@@ -51,8 +63,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser \
     && mkdir -p /app /app/data /app/logs /app/uploads \
     && chown -R appuser:appuser /app
 
-# 从构建阶段复制Python包
-COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+# 从构建阶段复制虚拟环境
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 # 切换到应用目录
 WORKDIR /app
@@ -87,38 +99,9 @@ EXPOSE 8000
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-# ==================== 开发阶段：包含开发工具 ====================
-FROM production as development
-
-# 切换回root用户安装开发工具
-USER root
-
-# 安装开发工具
-RUN pip install --no-cache-dir \
-    pytest==7.4.3 \
-    pytest-asyncio==0.21.1 \
-    pytest-cov==4.1.0 \
-    pytest-mock==3.12.0 \
-    black==23.11.0 \
-    isort==5.12.0 \
-    flake8==6.1.0 \
-    mypy==1.7.1 \
-    pre-commit==3.6.0 \
-    ipython \
-    debugpy
-
-# 安装额外的开发依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    vim \
-    htop \
-    && rm -rf /var/lib/apt/lists/*
-
-# 切换回应用用户
-USER appuser
-
-# 开发环境默认启动命令（支持热重载）
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# ==================== 开发阶段已移除 ====================
+# 注意: 开发阶段已移除以解决网络连接问题和优化构建性能
+# 开发调试功能通过Docker volume挂载和本地开发环境实现
 
 # ==================== 元数据标签 ====================
 LABEL maintainer="TradeMaster Team <team@trademaster.ai>" \

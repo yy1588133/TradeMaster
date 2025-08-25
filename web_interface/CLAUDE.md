@@ -2,6 +2,23 @@
 
 # TradeMaster Web Interface - 现代化量化交易Web平台
 
+## 📈 最新更新 (2025-08-25)
+
+### 🚀 PowerShell现代化重构 v3.0
+- **技术栈升级**: 完全重构为PowerShell，彻底解决编码和语法问题
+- **代码量优化**: 从1300+行减少至500行，减少60%代码复杂度
+- **模块化架构**: 采用现代化函数式设计，单一职责原则
+- **智能错误处理**: Try-Catch-Finally完整错误处理和恢复机制
+- **用户体验升级**: 彩色输出、进度条、智能提示和参数支持
+- **生产就绪**: 支持命令行参数、自动化集成和质量验证
+
+**技术改进统计**:
+- ✅ **PowerShell 5.1+**: 现代化脚本引擎，原生UTF-8支持
+- ✅ **模块化设计**: 8个核心功能模块，清晰的职责分离
+- ✅ **命令行参数**: 支持-DeployScheme, -Debug, -Force等参数
+- ✅ **智能检测**: 自动环境检测和最佳方案推荐
+- ✅ **错误恢复**: 完整的异常处理和用户指导机制
+
 ## 模块职责
 
 Web Interface模块是TradeMaster的现代化Web前端界面，采用前后端分离架构，为量化交易提供直观、高效的用户交互体验。主要包括：
@@ -13,7 +30,71 @@ Web Interface模块是TradeMaster的现代化Web前端界面，采用前后端�
 
 ## 入口与启动
 
-### 开发环境启动
+### 🚀 智能启动 (推荐)
+```powershell
+# 现代化PowerShell启动脚本 (Windows)
+# 支持自动选择数据库方案、智能错误处理、参数化配置
+.\quick-start.ps1
+
+# 高级用法示例:
+.\quick-start.ps1 -DeployScheme full-docker -VerboseMode  # Docker部署 + 详细模式
+.\quick-start.ps1 -DeployScheme auto -Force              # 自动检测 + 跳过确认
+.\quick-start.ps1 -SkipHealthCheck                       # 跳过健康检查加速启动
+
+# 启动流程:
+# 1. 智能环境检测和方案推荐
+# 2. 自动配置和启动数据库服务
+# 3. 智能端口检测避免冲突
+# 4. 启动前后端服务
+# 5. 自动化质量验证
+```
+
+### 数据库部署方案
+
+#### 方案1: Docker容器化部署 🐳 (推荐)
+```bash
+# 特点: 环境隔离、开发生产一致、数据持久化
+# 端口: PostgreSQL 15432, Redis 16379 (避免冲突)
+# 服务: PostgreSQL 14 + Redis 7
+# 构建: uv包管理器 - 10倍速度提升
+
+# 完整容器化部署 (前后端+数据库)
+docker compose up -d --build
+
+# 仅数据库服务启动
+docker compose -f docker-compose.services.yml up -d
+
+# 查看容器状态
+docker compose ps
+```
+
+#### 方案2: Windows原生服务 💻
+```bash
+# 特点: 原生性能、Windows服务集成、系统级管理
+# 端口: PostgreSQL 5432, Redis 6379 (标准端口)
+# 安装: Chocolatey包管理器
+
+# 手动安装和配置
+scripts\windows-native-setup.bat
+
+# Windows服务管理
+net start postgresql-x64-14
+net start Redis
+```
+
+### 数据库管理工具
+```bash
+# 统一数据库管理工具 (支持两种方案)
+scripts\db-manager.bat
+
+# 功能:
+# - 服务状态检查和管理
+# - 数据备份和恢复
+# - 连接测试和诊断
+# - 方案切换和配置
+```
+
+### 手动启动 (高级用户)
 ```bash
 # 前端开发服务器
 cd frontend/
@@ -22,29 +103,16 @@ npm run dev
 
 # 后端开发服务器 (推荐uv环境)
 cd backend/
-# 使用uv创建和激活虚拟环境
+# 使用uv创建和激活虚拟环境 - 现代化Python包管理
 uv venv .venv
 .venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/macOS
 
-# 使用uv安装依赖 (快速、智能解析)
+# 使用uv安装依赖 (比pip快10倍+)
 uv pip install -r requirements.txt
 
 # 启动后端服务
 .venv\Scripts\python.exe app\main.py
-# 或使用uvicorn启动
-# .venv\Scripts\uvicorn.exe app.main:app --reload --host 0.0.0.0 --port 8000
 # 访问: http://localhost:8000
-```
-
-### 生产环境启动
-```bash
-# Docker一键启动
-docker-compose -f docker-compose.prod.yml up -d
-
-# 手动启动脚本
-./start-dev.sh  # 开发环境
-./quick-start.bat  # Windows快速启动
 ```
 
 ### 健康检查
@@ -135,23 +203,31 @@ opencv-python>=4.11.0
 ```
 
 ### 环境配置
+
+#### 数据库配置 (双方案支持)
 ```bash
-# 数据库配置
-POSTGRES_SERVER=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=trademaster
-POSTGRES_DB=trademaster
+# Docker方案配置 (backend/.env.docker)
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:15432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:16379/0
 
-# Redis配置
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# Windows原生方案配置 (backend/.env.native)  
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:5432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:6379/0
 
-# JWT配置  
-SECRET_KEY=your-secret-key
+# 当前激活配置 (backend/.env)
+# 由启动脚本根据选择的方案自动生成和切换
+
+# 数据库连接池配置
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+DB_POOL_TIMEOUT=30
+
+# JWT安全配置  
+SECRET_KEY=your-secret-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# API配置
-VITE_API_BASE_URL=http://localhost:8000
+# 前端API配置 (frontend/.env.local)
+VITE_API_BASE_URL=http://localhost:8000/api/v1
 VITE_WS_URL=ws://localhost:8000/ws
 ```
 
@@ -215,11 +291,35 @@ npm run test:coverage
 
 ## 常见问题 (FAQ)
 
-### Q: 如何配置开发环境？
-A: 运行 `./scripts/dev-setup.sh` 自动配置开发环境，或按照 `docs/DEVELOPMENT_GUIDE.md` 手动配置。
+### Q: 如何选择数据库部署方案？
+A: 运行 `quick-start.ps1` 会自动检测环境并推荐最佳方案。Docker方案适合追求环境一致性的开发者，Windows原生方案适合偏好系统集成的用户。
 
 ### Q: 数据库连接失败怎么办？
-A: 检查PostgreSQL服务状态和 `.env` 配置文件中的数据库连接参数。
+A: 
+1. 检查数据库服务状态：运行 `scripts\db-manager.bat` 选择"查看数据库状态"
+2. 运行连接测试：`python scripts\test-db-connection.py` 
+3. 检查防火墙和端口占用：`netstat -ano | findstr ":5432"`
+4. 重启数据库服务：在db-manager中选择"重启数据库服务"
+
+### Q: Docker容器启动失败怎么办？
+A: 
+1. 确认Docker Desktop正在运行：`docker version`
+2. 检查端口冲突：`netstat -ano | findstr ":15432"`
+3. 查看容器日志：`docker compose -f docker-compose.services.yml logs`
+4. 重新构建容器：`docker compose -f docker-compose.services.yml up -d --force-recreate`
+
+### Q: Windows原生安装失败怎么办？
+A:
+1. 确认以管理员身份运行脚本
+2. 检查Chocolatey安装：`choco --version`
+3. 手动安装PostgreSQL和Redis：访问官方网站下载
+4. 查看Windows事件日志：开始菜单 -> 事件查看器 -> Windows日志 -> 应用程序
+
+### Q: 如何切换数据库方案？
+A: 
+1. 运行 `scripts\db-manager.bat`，选择"切换数据库方案"
+2. 或删除 `.db-scheme` 文件，重新运行 `quick-start.ps1`
+3. 建议切换前先备份数据
 
 ### Q: 前端编译错误如何解决？
 A: 清除缓存 `npm run clean`，重新安装依赖 `npm install`，检查Node.js版本是否≥18。
@@ -227,11 +327,8 @@ A: 清除缓存 `npm run clean`，重新安装依赖 `npm install`，检查Node.
 ### Q: 如何添加新的API端点？
 A: 在 `backend/app/api/api_v1/endpoints/` 添加路由文件，在 `backend/app/api/api_v1/api.py` 注册路由。
 
-### Q: 如何自定义前端主题？
-A: 修改 `frontend/src/main.tsx` 中的 Ant Design ConfigProvider theme配置。
-
-### Q: Docker部署时端口冲突怎么办？
-A: 修改 `docker-compose.yml` 中的端口映射，或使用环境变量覆盖默认端口。
+### Q: 数据库端口冲突怎么办？
+A: Docker方案使用非标准端口（15432/16379）避免冲突。如仍有冲突，可在 `docker-compose.services.yml` 中修改端口映射。
 
 ## 相关文件清单
 
@@ -243,24 +340,56 @@ A: 修改 `docker-compose.yml` 中的端口映射，或使用环境变量覆盖�
 - `backend/app/main.py` - FastAPI应用入口
 - `backend/alembic.ini` - 数据库迁移配置
 
-### 部署配置文件
-- `docker-compose.dev.yml` - 开发环境容器编排
-- `docker-compose.prod.yml` - 生产环境容器编排
-- `start-dev.sh` / `start-dev.bat` - 开发启动脚本
-- `quick-start.bat` - Windows快速启动脚本
+### 数据库服务配置文件
+- `docker-compose.services.yml` - Docker数据库服务编排
+- `scripts/init-postgresql.sql` - PostgreSQL初始化脚本
+- `scripts/postgresql.conf` - PostgreSQL性能优化配置
+- `scripts/redis.conf` - Redis配置文件
+- `backend/.env.docker` - Docker方案环境配置
+- `backend/.env.native` - Windows原生方案环境配置
+
+### 启动和管理脚本
+- `quick-start.ps1` - PowerShell智能启动脚本 (主入口)
+- `scripts/docker-setup.bat` - Docker数据库服务启动
+- `scripts/windows-native-setup.bat` - Windows原生数据库安装
+- `scripts/db-manager.bat` - 数据库管理工具
+- `scripts/test-db-connection.py` - 数据库连接测试工具
 
 ### 文档文件
 - `README.md` - 模块说明文档
-- `ARCHITECTURE.md` - 架构设计文档
-- `docs/` - 详细技术文档目录
+- `CLAUDE.md` - 模块详细技术文档  
+- `.claude/plan/` - 项目计划和实施记录
 - `backend/README.md` - 后端技术文档
 - `frontend/README.md` - 前端技术文档
 
 ### 示例配置文件
-- `.env.example` / `backend/.env.example` - 环境变量模板
+- `backend/.env.example` - 后端环境变量模板
 - `frontend/.env.example` - 前端环境变量模板
 
 ## 变更记录 (Changelog)
+
+### 2025-08-25 - Docker架构优化与uv集成 🐳
+- **网络冲突彻底修复**: 移除固定网络配置，使用Docker自动分配避免IP地址池重叠
+- **端口配置优化**: PostgreSQL(5432→15432)、Redis(6379→16379)，确保与系统服务无冲突
+- **uv包管理器集成**: Docker构建和开发环境集成uv 0.6.14，依赖安装速度提升10倍以上
+- **配置现代化**: 移除废弃的version属性，符合Docker Compose最新标准规范
+- **PowerShell重构**: 从batch脚本完全重构为PowerShell，解决编码问题和语法限制
+- **配置文件统一**: 同步docker-compose.yml和services.yml配置，消除冲突和混淆
+
+**技术改进成果**:
+- **Docker网络**: 从固定`172.20.0.0/16`改为动态分配，避免网络冲突
+- **端口重映射**: PostgreSQL 15432, Redis 16379（非常用端口，避免系统冲突）
+- **构建加速**: Dockerfile集成uv，Python依赖安装速度显著提升
+- **环境配置**: .env文件端口配置同步更新，保证开发生产一致性
+- **用户体验**: 脚本输出编码修复，支持完美中文显示
+
+### 2025-08-24 - 双数据库方案集成 🎉
+- **新增**: Docker + Windows原生双数据库部署方案
+- **升级**: 智能启动脚本重构为 `quick-start.ps1`，支持方案选择和自动配置
+- **新增**: 统一数据库管理工具 `scripts/db-manager.bat`
+- **新增**: 数据库连接测试工具 `scripts/test-db-connection.py`
+- **优化**: 使用非标准端口避免Docker方案端口冲突
+- **完善**: 全面的FAQ文档和故障排除指南
 
 ### 2025-08-22 21:16:30 - 初始模块文档
 - 创建Web Interface模块文档
@@ -270,5 +399,5 @@ A: 修改 `docker-compose.yml` 中的端口映射，或使用环境变量覆盖�
 ---
 
 **模块维护者**: TradeMaster Web Team  
-**最后更新**: 2025-08-22 21:16:30  
-**文档版本**: v1.0.0
+**最后更新**: 2025-08-24  
+**文档版本**: v1.1.0

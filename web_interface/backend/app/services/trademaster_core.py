@@ -65,30 +65,71 @@ except ImportError as e:
 
 # TradeMaster核心模块可选依赖
 try:
+    # 第一步：检查基础依赖
     from mmengine.config import Config
     
-    # 导入TradeMaster核心模块
-    from trademaster.agents.builder import build_agent, AGENTS
-    from trademaster.datasets.builder import build_dataset, DATASETS
-    from trademaster.environments.builder import build_environment, ENVIRONMENTS
-    from trademaster.utils import build_from_cfg
+    # 第二步：检查mmcv Registry
+    try:
+        from mmcv.utils.registry import Registry
+        logger.info("mmcv Registry导入成功")
+        REGISTRY_AVAILABLE = True
+    except ImportError:
+        try:
+            from mmcv.registry import Registry
+            logger.info("mmcv Registry导入成功 (新版本路径)")
+            REGISTRY_AVAILABLE = True
+        except ImportError:
+            Registry = None
+            REGISTRY_AVAILABLE = False
+            logger.info("mmcv Registry不可用，Web界面功能正常")
     
-    # 导入具体实现
-    from trademaster.agents.algorithmic_trading.dqn import AlgorithmicTradingDQN
-    from trademaster.agents.portfolio_management.eiie import PortfolioManagementEIIE
-    from trademaster.agents.portfolio_management.deeptrader import PortfolioManagementDeepTrader
-    from trademaster.agents.order_execution.eteo import OrderExecutionETEO
-    from trademaster.agents.high_frequency_trading.ddqn import HighFrequencyTradingDDQN
-    
-    TRADEMASTER_AVAILABLE = True
-    logger.info("TradeMaster核心模块导入成功")
+    # 第三步：只在Registry可用时尝试导入TradeMaster核心模块
+    if REGISTRY_AVAILABLE:
+        try:
+            # 导入TradeMaster核心模块
+            from trademaster.agents.builder import build_agent, AGENTS
+            from trademaster.datasets.builder import build_dataset, DATASETS
+            from trademaster.environments.builder import build_environment, ENVIRONMENTS
+            from trademaster.utils import build_from_cfg
+            
+            # 导入具体实现
+            from trademaster.agents.algorithmic_trading.dqn import AlgorithmicTradingDQN
+            from trademaster.agents.portfolio_management.eiie import PortfolioManagementEIIE
+            from trademaster.agents.portfolio_management.deeptrader import PortfolioManagementDeepTrader
+            from trademaster.agents.order_execution.eteo import OrderExecutionETEO
+            from trademaster.agents.high_frequency_trading.ddqn import HighFrequencyTradingDDQN
+            
+            TRADEMASTER_AVAILABLE = True
+            logger.info("🎉 TradeMaster完整功能可用")
+            
+        except ImportError as e:
+            # TradeMaster包不可用，但mmcv正常
+            build_agent = build_dataset = build_environment = build_from_cfg = None
+            AGENTS = DATASETS = ENVIRONMENTS = None
+            TRADEMASTER_AVAILABLE = False
+            
+            if "trademaster" in str(e).lower():
+                logger.info("TradeMaster包未安装，仅提供基础Web功能")
+            else:
+                logger.info("TradeMaster模块部分功能不可用")
+    else:
+        # Registry不可用时设置默认值
+        build_agent = build_dataset = build_environment = build_from_cfg = None
+        AGENTS = DATASETS = ENVIRONMENTS = None
+        TRADEMASTER_AVAILABLE = False
     
 except ImportError as e:
+    # 基础依赖不可用
     Config = None
     build_agent = build_dataset = build_environment = build_from_cfg = None
     AGENTS = DATASETS = ENVIRONMENTS = None
     TRADEMASTER_AVAILABLE = False
-    logger.warning(f"TradeMaster核心模块导入失败: {str(e)}")
+    REGISTRY_AVAILABLE = False
+    
+    if "mmengine" in str(e).lower():
+        logger.info("mmengine未安装，Web界面功能正常")
+    else:
+        logger.info("基础依赖检查失败，Web界面功能正常")
 
 from app.core.trademaster_config import get_config_adapter, TradeMasterConfigError
 

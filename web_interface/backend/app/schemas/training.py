@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, ConfigDict
 
 from app.schemas.base import BaseSchema, TimestampSchema, UUIDSchema
 from app.models.database import TrainingStatus
@@ -224,6 +224,9 @@ class TrainingJobUpdate(BaseSchema):
 
 class TrainingJobInDB(TrainingJobBase, TimestampSchema, UUIDSchema):
     """数据库中的训练任务模式"""
+    # 解决Pydantic字段命名冲突警告
+    model_config = ConfigDict(protected_namespaces=())
+    
     id: int = Field(..., description="任务ID")
     status: TrainingStatus = Field(..., description="任务状态")
     progress: float = Field(..., description="进度百分比")
@@ -290,6 +293,9 @@ class TrainingJobResponse(BaseSchema):
 
 class TrainingJobDetail(TrainingJobResponse):
     """训练任务详情模式"""
+    # 解决Pydantic字段命名冲突警告
+    model_config = ConfigDict(protected_namespaces=())
+    
     config: TrainingConfig = Field(..., description="训练配置")
     hyperparameters: HyperParameters = Field(..., description="超参数")
     

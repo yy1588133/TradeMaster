@@ -186,10 +186,10 @@ TradeMaster/
 ### 环境要求
 
 **最低要求**：
-- Node.js 16+
+- Node.js 18+
 - Python 3.8+
-- Docker 20.10+
-- Docker Compose 2.0+
+- Docker 20.10+ (Docker方案)
+- uv 0.6+ (推荐Python包管理器)
 
 **推荐配置**：
 - 16GB RAM
@@ -203,42 +203,65 @@ git clone https://github.com/TradeMaster-NTU/TradeMaster.git
 cd TradeMaster/web_interface
 ```
 
-### 2. 一键部署 (推荐)
+### 2. 🎯 一键智能启动 (推荐)
 
-#### 开发环境部署
-
-```bash
-# 复制环境配置
-cp .env.dev.template .env.dev
-
-# 一键启动开发环境
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh dev
-
-# 等待服务启动完成...
-```
-
-**访问地址**：
-- 🌐 **Web界面**: http://localhost:3000
-- 📚 **API文档**: http://localhost:8000/docs
-- 🗄️ **数据库管理**: http://localhost:5050 (pgAdmin)
-- 🔍 **Redis管理**: http://localhost:8081 (Redis Commander)
-
-#### 生产环境部署
+#### Windows智能启动脚本
 
 ```bash
-# 配置生产环境
-cp .env.prod.template .env.prod
-# 编辑 .env.prod 填入实际配置
+# 双数据库方案智能启动 (支持Docker/Windows原生)
+quick-start.bat
 
-# 部署生产环境
-./scripts/deploy.sh prod
+# 启动流程：
+# 1. 自动检测环境 (Docker可用性/管理员权限)
+# 2. 选择数据库方案 (Docker容器化/Windows原生)
+# 3. 自动安装和配置数据库服务
+# 4. 智能端口检测避免冲突
+# 5. 启动前后端服务
 
-# 或使用Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
+# 访问地址：
+# 🌐 前端界面: http://localhost:3000 (动态检测)
+# 📚 API文档:  http://localhost:8000/docs (动态检测)
 ```
 
-### 3. 手动部署
+#### 数据库方案选择
+
+**方案1: Docker容器化 🐳 (推荐)**
+```bash
+# 特点:
+# ✓ 环境隔离，开发生产一致
+# ✓ PostgreSQL 14 + Redis 7
+# ✓ 端口: 15432/16379 (避免冲突)
+# ✓ 数据持久化和自动备份
+
+# 要求: Docker Desktop已安装并运行
+```
+
+**方案2: Windows原生服务 💻**
+```bash
+# 特点:
+# ✓ 原生性能，系统深度集成  
+# ✓ 使用Chocolatey包管理器
+# ✓ 端口: 5432/6379 (标准端口)
+# ✓ Windows服务管理器集成
+
+# 要求: 管理员权限运行脚本
+```
+
+### 3. 数据库管理工具
+
+```bash
+# 统一数据库管理 (支持两种方案)
+scripts\db-manager.bat
+
+# 功能菜单:
+# [1] 查看数据库状态    [6] 连接测试
+# [2] 重启数据库服务    [7] 数据备份  
+# [3] 停止数据库服务    [8] 数据恢复
+# [4] 启动数据库服务    [9] 清理数据库
+# [5] 查看数据库日志    [0] 切换方案
+```
+
+### 4. 手动启动 (高级用户)
 
 #### 前端开发环境
 
@@ -248,52 +271,63 @@ cd frontend
 # 安装依赖
 npm install
 
-# 启动开发服务器
+# 启动开发服务器 (自动检测可用端口)
 npm run dev
 ```
 
-#### 后端开发环境
+#### 后端开发环境 (推荐uv)
 
 ```bash
 cd backend
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
+# 使用uv创建虚拟环境 (更快的包管理)
+uv venv .venv
+.venv\Scripts\activate  # Windows
 
-# 安装依赖
-pip install -r requirements.txt
+# 使用uv安装依赖 (比pip快10倍+)
+uv pip install -r requirements.txt
 
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件
-
-# 数据库迁移
-alembic upgrade head
+# 配置环境变量 (自动选择数据库方案配置)
+# .env.docker  -> Docker方案
+# .env.native  -> Windows原生方案
+# .env         -> 当前激活配置
 
 # 启动开发服务器
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+.venv\Scripts\python.exe app\main.py
 ```
 
-### 4. 初始化数据
+### 5. 连接测试和故障排除
 
 ```bash
-# 创建管理员用户
-docker-compose exec backend python app/scripts/init_database.py
+# Python数据库连接测试工具
+cd scripts
+python test-db-connection.py
 
-# 或手动创建
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "email": "admin@example.com",
-    "password": "AdminPass123!",
-    "role": "admin"
-  }'
+# 输出示例:
+# ==========================================
+#      TradeMaster 数据库连接测试
+# ==========================================
+# 数据库方案: docker
+# ✅ PostgreSQL连接成功 (localhost:15432)
+# ✅ Redis连接成功 (localhost:16379)
+# 🎉 所有数据库连接测试通过！
 ```
 
 ## 🎯 核心功能使用
+
+### 数据库连接验证
+
+项目支持两种数据库部署方案，每种方案都有对应的连接配置：
+
+```python
+# Docker方案连接配置
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:15432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:16379/0
+
+# Windows原生方案连接配置  
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:5432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:6379/0
+```
 
 ### 用户认证
 
@@ -358,56 +392,95 @@ curl -X POST "http://localhost:8000/api/v1/data/upload" \
 
 ### 环境变量配置
 
-#### 开发环境 (.env.dev)
-```bash
-# 项目配置
-PROJECT_NAME=TradeMaster Web Interface (Dev)
-DEBUG=true
-LOG_LEVEL=DEBUG
+#### 双数据库方案配置
 
-# 数据库配置
-POSTGRES_USER=trademaster
-POSTGRES_PASSWORD=dev_password_123
-POSTGRES_DB=trademaster_web
+**Docker方案配置** (`backend/.env.docker`)
+```bash
+# Docker容器化数据库配置
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:15432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:16379/0
+
+# Docker特性
+DOCKER_DEPLOYMENT=true
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
+```
+
+**Windows原生方案配置** (`backend/.env.native`)
+```bash
+# Windows原生服务数据库配置
+DATABASE_URL=postgresql+asyncpg://trademaster:TradeMaster2024!@localhost:5432/trademaster_web
+REDIS_URL=redis://:TradeMaster2024!@localhost:6379/0
+
+# 原生特性
+WINDOWS_NATIVE_DEPLOYMENT=true
+POSTGRESQL_SERVICE_NAME=postgresql-x64-14
+REDIS_SERVICE_NAME=Redis
+```
+
+**当前激活配置** (`backend/.env`)
+```bash
+# 由启动脚本根据选择的方案自动生成
+# 包含完整的应用配置参数
+
+# 项目配置
+PROJECT_NAME=TradeMaster Web Interface
+DEBUG=true
+LOG_LEVEL=INFO
 
 # 认证配置
-SECRET_KEY=dev-secret-key-change-in-production
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+SECRET_KEY=development-secret-key-change-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # TradeMaster集成
 TRADEMASTER_API_URL=http://localhost:8080
 ```
 
-#### 生产环境 (.env.prod)
+**前端配置** (`frontend/.env.local`)
 ```bash
-# 项目配置
-PROJECT_NAME=TradeMaster Web Interface
-DEBUG=false
-LOG_LEVEL=INFO
+# 前端API配置 (动态生成)
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_WS_URL=ws://localhost:8000/ws
+VITE_API_TIMEOUT=30000
 
-# 数据库配置 (必须修改)
-POSTGRES_PASSWORD=CHANGE_THIS_STRONG_PASSWORD_123!@#
-REDIS_PASSWORD=CHANGE_THIS_REDIS_PASSWORD_456!@#
-
-# 安全配置 (必须修改)
-SECRET_KEY=CHANGE_THIS_TO_A_VERY_STRONG_RANDOM_SECRET_KEY
-
-# 域名配置
-BACKEND_CORS_ORIGINS=["https://your-domain.com"]
-REACT_APP_API_BASE_URL=https://your-domain.com/api/v1
+# 开发调试
+VITE_DEBUG=true
+VITE_DEBUG_API=true
+NODE_ENV=development
 ```
 
-### Docker Compose配置
+### Docker服务配置
+
+#### 数据库服务 (docker-compose.services.yml)
+
+| 服务 | 端口映射 | 描述 |
+|------|----------|------|
+| `postgresql` | 15432→5432 | PostgreSQL 14数据库 (非标准端口避免冲突) |
+| `redis` | 16379→6379 | Redis 7缓存服务 (非标准端口避免冲突) |
+
+#### Web应用服务 (主应用)
 
 | 服务 | 端口 | 描述 |
 |------|------|------|
-| `nginx` | 80/443 | 反向代理和静态文件服务 |
-| `frontend` | 3000 | React开发服务器 |
-| `backend` | 8000 | FastAPI后端服务 |
-| `postgres` | 5432 | PostgreSQL数据库 |
-| `redis` | 6379 | Redis缓存服务 |
-| `pgadmin` | 5050 | 数据库管理界面 |
+| `frontend` | 3000+ | React开发服务器 (智能检测可用端口) |
+| `backend` | 8000+ | FastAPI后端服务 (智能检测可用端口) |
+
+#### 服务管理命令
+
+```bash
+# Docker方案管理
+docker compose -f docker-compose.services.yml up -d    # 启动数据库服务
+docker compose -f docker-compose.services.yml ps       # 查看服务状态  
+docker compose -f docker-compose.services.yml logs     # 查看服务日志
+docker compose -f docker-compose.services.yml down     # 停止服务
+
+# Windows原生方案管理
+net start postgresql-x64-14    # 启动PostgreSQL
+net start Redis                # 启动Redis  
+net stop postgresql-x64-14     # 停止PostgreSQL
+net stop Redis                 # 停止Redis
+```
 
 ## 🧪 测试
 

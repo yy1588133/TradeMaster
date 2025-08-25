@@ -63,26 +63,31 @@ wait_for_database() {
 wait_for_redis() {
     log_info "等待Redis服务启动..."
     
-    # 从REDIS_URL提取Redis连接信息
-    if [[ $REDIS_URL =~ redis://([^:]+):([0-9]+) ]]; then
-        REDIS_HOST="${BASH_REMATCH[1]}"
-        REDIS_PORT="${BASH_REMATCH[2]}"
-    elif [[ $REDIS_URL =~ redis://([^:/]+)/([0-9]+) ]]; then
-        REDIS_HOST="${BASH_REMATCH[1]}"
-        REDIS_PORT="6379"  # 默认Redis端口
-    else
-        # 简化解析：对于redis://redis:6379/0格式
-        REDIS_HOST=$(echo $REDIS_URL | cut -d'/' -f3 | cut -d':' -f1)
-        REDIS_PORT=$(echo $REDIS_URL | cut -d'/' -f3 | cut -d':' -f2)
-        
-        # 如果没有端口，使用默认端口
-        if [ "$REDIS_PORT" = "$REDIS_HOST" ]; then
-            REDIS_PORT="6379"
-        fi
+    # 使用Python urlparse解析Redis URL，更加可靠
+    REDIS_CONNECTION_INFO=$(python3 -c "
+import sys
+from urllib.parse import urlparse
+
+try:
+    redis_url = sys.argv[1]
+    parsed = urlparse(redis_url)
+    print(f'{parsed.hostname}:{parsed.port or 6379}')
+except Exception as e:
+    print(f'ERROR:{e}', file=sys.stderr)
+    sys.exit(1)
+" "$REDIS_URL")
+    
+    if [[ $REDIS_CONNECTION_INFO == ERROR:* ]]; then
+        log_error "无法从REDIS_URL解析Redis连接信息: $REDIS_URL"
+        log_error "解析错误: ${REDIS_CONNECTION_INFO#ERROR:}"
+        exit 1
     fi
     
+    REDIS_HOST=$(echo $REDIS_CONNECTION_INFO | cut -d':' -f1)
+    REDIS_PORT=$(echo $REDIS_CONNECTION_INFO | cut -d':' -f2)
+    
     if [ -z "$REDIS_HOST" ] || [ -z "$REDIS_PORT" ]; then
-        log_error "无法从REDIS_URL解析Redis连接信息: $REDIS_URL"
+        log_error "Redis连接信息解析失败: 主机=$REDIS_HOST, 端口=$REDIS_PORT"
         exit 1
     fi
     
@@ -117,12 +122,21 @@ from urllib.parse import urlparse
 try:
     redis_url = os.getenv('REDIS_URL')
     parsed = urlparse(redis_url)
-    r = redis.Redis(
-        host=parsed.hostname,
-        port=parsed.port,
-        db=int(parsed.path[1:]) if parsed.path and len(parsed.path) > 1 else 0,
-        decode_responses=True
-    )
+    
+    # 构建Redis连接参数
+    redis_params = {
+        'host': parsed.hostname,
+        'port': parsed.port or 6379,
+        'db': int(parsed.path[1:]) if parsed.path and len(parsed.path) > 1 else 0,
+        'decode_responses': True
+    }
+    
+    # 如果URL中包含密码，添加到连接参数
+    if parsed.password:
+        redis_params['password'] = parsed.password
+    
+    # 创建Redis连接
+    r = redis.Redis(**redis_params)
     r.ping()
     print('Redis连接成功')
 except Exception as e:

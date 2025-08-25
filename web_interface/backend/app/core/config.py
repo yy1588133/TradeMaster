@@ -9,7 +9,7 @@ import os
 from typing import Any, Dict, List, Optional, Union
 from functools import lru_cache
 
-from pydantic import PostgresDsn, HttpUrl, Field, field_validator
+from pydantic import PostgresDsn, HttpUrl, Field, field_validator, ConfigDict
 from pydantic.networks import AnyHttpUrl
 from pydantic_settings import BaseSettings
 
@@ -21,9 +21,17 @@ class Settings(BaseSettings):
     支持从.env文件加载配置，提供合理的默认值。
     """
     
+    # 设置模型配置，允许额外字段以兼容现有.env文件
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"  # 忽略额外的环境变量，避免验证错误
+    )
+    
     # ==================== 基础配置 ====================
-    PROJECT_NAME: str = "TradeMaster Web Interface"
-    VERSION: str = "1.0.0"
+    PROJECT_NAME: str = Field(default="TradeMaster Web Interface", alias="APP_NAME")
+    VERSION: str = Field(default="1.0.0", alias="APP_VERSION")
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = Field(default=False, description="调试模式开关")
     
@@ -106,13 +114,13 @@ class Settings(BaseSettings):
     REQUIRE_SPECIAL_CHARS: bool = Field(default=True, description="密码是否需要特殊字符")
     
     # ==================== 数据库配置 ====================
-    POSTGRES_SERVER: str = Field(default="localhost", description="PostgreSQL服务器地址")
-    POSTGRES_USER: str = Field(default="postgres", description="数据库用户名")
-    POSTGRES_PASSWORD: str = Field(default="password", description="数据库密码")
-    POSTGRES_DB: str = Field(default="trademaster_web", description="数据库名称")
-    POSTGRES_PORT: str = Field(default="5432", description="数据库端口")
+    POSTGRES_SERVER: str = Field(default="localhost", description="PostgreSQL服务器地址", alias="DB_HOST")
+    POSTGRES_USER: str = Field(default="postgres", description="数据库用户名", alias="DB_USER")
+    POSTGRES_PASSWORD: str = Field(default="password", description="数据库密码", alias="DB_PASSWORD")
+    POSTGRES_DB: str = Field(default="trademaster_web", description="数据库名称", alias="DB_NAME")
+    POSTGRES_PORT: str = Field(default="5432", description="数据库端口", alias="DB_PORT")
     
-    DATABASE_URL: Optional[PostgresDsn] = None
+    DATABASE_URL: Optional[str] = None
     
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -121,15 +129,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v
         
-        # 在Pydantic v2中，需要从info.data获取其他字段值
+        # 如果没有设置DATABASE_URL，从其他字段构建
         values = info.data if hasattr(info, 'data') else {}
-        return PostgresDsn.build(
-            scheme="postgresql+asyncpg",
-            username=values.get("POSTGRES_USER"),
-            password=values.get("POSTGRES_PASSWORD"),
-            host=values.get("POSTGRES_SERVER"),
-            port=int(values.get("POSTGRES_PORT", "5432")),
-            path=f"/{values.get('POSTGRES_DB') or ''}",
+        return (
+            f"postgresql+asyncpg://{values.get('POSTGRES_USER', 'postgres')}"
+            f":{values.get('POSTGRES_PASSWORD', 'password')}"
+            f"@{values.get('POSTGRES_SERVER', 'localhost')}"
+            f":{values.get('POSTGRES_PORT', '5432')}"
+            f"/{values.get('POSTGRES_DB', 'trademaster_web')}"
         )
     
     # 数据库连接池配置
@@ -205,6 +212,7 @@ class Settings(BaseSettings):
     
     # ==================== 日志配置 ====================
     LOG_LEVEL: str = Field(default="INFO", description="日志级别")
+    SQLALCHEMY_LOG_LEVEL: str = Field(default="WARNING", description="SQLAlchemy日志级别")
     LOG_FORMAT: str = Field(default="json", description="日志格式")
     LOG_FILE_MAX_SIZE: int = Field(
         default=10 * 1024 * 1024,  # 10MB
@@ -290,6 +298,15 @@ class Settings(BaseSettings):
         if self.DATABASE_URL:
             return str(self.DATABASE_URL)
         
+        # 如果是开发环境或没有配置PostgreSQL，使用SQLite
+        if (self.is_development or 
+            not self.POSTGRES_PASSWORD or
+            self.POSTGRES_PASSWORD == "password"):
+            
+            sqlite_path = "sqlite+aiosqlite:///./trademaster_web.db"
+            return sqlite_path if async_driver else sqlite_path.replace("+aiosqlite", "")
+        
+        # 生产环境使用PostgreSQL
         driver = "postgresql+asyncpg" if async_driver else "postgresql"
         return (
             f"{driver}://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
@@ -308,11 +325,6 @@ class Settings(BaseSettings):
         upload_dir = os.path.abspath(self.UPLOAD_DIR)
         os.makedirs(upload_dir, exist_ok=True)
         return os.path.join(upload_dir, filename)
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        env_file_encoding = "utf-8"
         
 
 @lru_cache()

@@ -79,6 +79,16 @@ mmengine>=0.10.7
 mmcv>=2.2.0
 opencv-python>=4.11.0,<4.12
 
+# TradeMaster核心依赖
+prettytable==3.16.0
+iopath==0.1.10
+statsmodels==0.14.5
+tslearn==0.6.4
+seaborn==0.13.2
+fastdtw==0.3.4
+gym==0.26.2
+gymnasium==1.2.0
+
 # ==================== 开发工具依赖 ====================
 # 测试框架
 pytest==7.4.3

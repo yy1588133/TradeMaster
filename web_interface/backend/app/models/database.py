@@ -12,14 +12,65 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime, Numeric, 
     BigInteger, ForeignKey, Index, CheckConstraint, UniqueConstraint,
-    event, func, text
+    event, func, text, JSON
 )
-from sqlalchemy.dialects.postgresql import JSONB, ARRAY, INET, TSRANGE, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, INET, TSRANGE, UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.ext.hybrid import hybrid_property
 import uuid
 
 from app.core.database import Base
+from app.core.config import settings
+
+
+# 兼容的类型定义 - 支持PostgreSQL和SQLite
+def get_json_type():
+    """获取兼容的JSON类型"""
+    database_url = getattr(settings, 'DATABASE_URL', '') or settings.get_database_url(async_driver=True)
+    if database_url and database_url.startswith('sqlite'):
+        return JSON
+    else:
+        from sqlalchemy.dialects.postgresql import JSONB
+        return JSONB
+
+def get_uuid_type():
+    """获取兼容的UUID类型"""
+    database_url = getattr(settings, 'DATABASE_URL', '') or settings.get_database_url(async_driver=True)
+    if database_url and database_url.startswith('sqlite'):
+        return String(36)  # SQLite中用固定长度字符串存储UUID
+    else:
+        return UUID(as_uuid=False)  # PostgreSQL中使用字符串形式的UUID
+
+def get_inet_type():
+    """获取兼容的INET类型 - 用于存储IP地址"""
+    database_url = getattr(settings, 'DATABASE_URL', '') or settings.get_database_url(async_driver=True)
+    if database_url and database_url.startswith('sqlite'):
+        return String(45)  # SQLite中使用字符串存储IP地址 (支持IPv6)
+    else:
+        return INET  # PostgreSQL中使用INET类型
+
+def get_array_type(item_type=String):
+    """获取兼容的ARRAY类型 - 用于存储数组数据"""
+    database_url = getattr(settings, 'DATABASE_URL', '') or settings.get_database_url(async_driver=True)
+    if database_url and database_url.startswith('sqlite'):
+        return Text  # SQLite中使用TEXT存储JSON格式的数组数据
+    else:
+        return ARRAY(item_type)  # PostgreSQL中使用ARRAY类型
+
+def get_tsrange_type():
+    """获取兼容的TSRANGE类型 - 用于存储时间范围"""
+    database_url = getattr(settings, 'DATABASE_URL', '') or settings.get_database_url(async_driver=True)
+    if database_url and database_url.startswith('sqlite'):
+        return String(100)  # SQLite中使用字符串存储时间范围 (格式: "2023-01-01T00:00:00Z,2023-12-31T23:59:59Z")
+    else:
+        return TSRANGE  # PostgreSQL中使用TSRANGE类型
+
+# 全局类型变量
+CompatibleJSON = get_json_type()
+CompatibleUUID = get_uuid_type()
+CompatibleINET = get_inet_type()
+CompatibleARRAY = get_array_type
+CompatibleTSRANGE = get_tsrange_type()
 
 
 # ==================== 枚举类型定义 ====================
@@ -123,7 +174,7 @@ class TimestampMixin:
 class UUIDMixin:
     """UUID混入类"""
     uuid: Mapped[str] = mapped_column(
-        UUID(as_uuid=False),
+        CompatibleUUID,
         default=lambda: str(uuid.uuid4()),
         unique=True,
         nullable=False,
@@ -192,7 +243,7 @@ class User(Base, TimestampMixin, UUIDMixin):
     
     # 个人设置
     settings: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="用户设置"
+        CompatibleJSON, default=dict, nullable=False, comment="用户设置"
     )
     
     # 关系映射
@@ -257,7 +308,7 @@ class UserSession(Base, TimestampMixin):
     
     # 设备信息
     ip_address: Mapped[Optional[str]] = mapped_column(
-        INET, comment="IP地址"
+        CompatibleINET, comment="IP地址"
     )
     user_agent: Mapped[Optional[str]] = mapped_column(
         Text, comment="用户代理"
@@ -325,10 +376,10 @@ class Strategy(Base, TimestampMixin, UUIDMixin):
     
     # 配置信息
     config: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="策略配置"
+        CompatibleJSON, default=dict, nullable=False, comment="策略配置"
     )
     parameters: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="策略参数"
+        CompatibleJSON, default=dict, nullable=False, comment="策略参数"
     )
     
     # 性能指标
@@ -356,7 +407,7 @@ class Strategy(Base, TimestampMixin, UUIDMixin):
     
     # 标签和分类
     tags: Mapped[List[str]] = mapped_column(
-        ARRAY(String), default=list, nullable=False, comment="标签列表"
+        CompatibleARRAY(String), default=list, nullable=False, comment="标签列表"
     )
     category: Mapped[Optional[str]] = mapped_column(
         String(50), comment="策略分类"
@@ -414,10 +465,10 @@ class StrategyVersion(Base, TimestampMixin):
         String(20), nullable=False, comment="版本号"
     )
     config: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, comment="版本配置"
+        CompatibleJSON, nullable=False, comment="版本配置"
     )
     parameters: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="版本参数"
+        CompatibleJSON, default=dict, nullable=False, comment="版本参数"
     )
     changelog: Mapped[Optional[str]] = mapped_column(
         Text, comment="变更日志"
@@ -482,7 +533,7 @@ class Dataset(Base, TimestampMixin, UUIDMixin):
         Integer, comment="列数"
     )
     columns: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
-        JSONB, comment="列信息"
+        CompatibleJSON, comment="列信息"
     )
     
     # 状态信息
@@ -495,10 +546,10 @@ class Dataset(Base, TimestampMixin, UUIDMixin):
     
     # 统计信息
     statistics: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, comment="数据统计信息"
+        CompatibleJSON, comment="数据统计信息"
     )
     sample_data: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(
-        JSONB, comment="样本数据"
+        CompatibleJSON, comment="样本数据"
     )
     
     # 关联信息
@@ -570,18 +621,18 @@ class TrainingJob(Base, TimestampMixin, UUIDMixin):
     
     # 配置信息
     config: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, comment="训练配置"
+        CompatibleJSON, nullable=False, comment="训练配置"
     )
     hyperparameters: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="超参数"
+        CompatibleJSON, default=dict, nullable=False, comment="超参数"
     )
     
     # 结果信息
     metrics: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="训练指标"
+        CompatibleJSON, default=dict, nullable=False, comment="训练指标"
     )
     best_metrics: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="最佳指标"
+        CompatibleJSON, default=dict, nullable=False, comment="最佳指标"
     )
     model_path: Mapped[Optional[str]] = mapped_column(
         String(500), comment="模型文件路径"
@@ -686,7 +737,7 @@ class TrainingMetric(Base):
     
     # 指标数据
     metrics: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, comment="指标数据"
+        CompatibleJSON, nullable=False, comment="指标数据"
     )
     
     # 时间戳
@@ -738,21 +789,21 @@ class Evaluation(Base, TimestampMixin, UUIDMixin):
     
     # 配置信息
     config: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, nullable=False, comment="评估配置"
+        CompatibleJSON, nullable=False, comment="评估配置"
     )
     time_range: Mapped[Optional[str]] = mapped_column(
-        TSRANGE, comment="评估时间范围"
+        CompatibleTSRANGE, comment="评估时间范围"
     )
     
     # 结果信息
     results: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="评估结果"
+        CompatibleJSON, default=dict, nullable=False, comment="评估结果"
     )
     report_path: Mapped[Optional[str]] = mapped_column(
         String(500), comment="报告文件路径"
     )
     charts: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSONB, default=list, nullable=False, comment="图表数据"
+        CompatibleJSON, default=list, nullable=False, comment="图表数据"
     )
     
     # 关联信息
@@ -827,13 +878,13 @@ class SystemLog(Base):
     
     # 额外数据
     extra_metadata: Mapped[Dict[str, Any]] = mapped_column(
-        JSONB, default=dict, nullable=False, comment="元数据"
+        CompatibleJSON, default=dict, nullable=False, comment="元数据"
     )
     stack_trace: Mapped[Optional[str]] = mapped_column(
         Text, comment="堆栈跟踪"
     )
     ip_address: Mapped[Optional[str]] = mapped_column(
-        INET, comment="IP地址"
+        CompatibleINET, comment="IP地址"
     )
     user_agent: Mapped[Optional[str]] = mapped_column(
         Text, comment="用户代理"
@@ -884,13 +935,13 @@ class CeleryTask(Base, TimestampMixin):
     
     # 任务参数
     args: Mapped[Optional[List[Any]]] = mapped_column(
-        JSONB, comment="位置参数"
+        CompatibleJSON, comment="位置参数"
     )
     kwargs: Mapped[Optional[Dict[str, Any]]] = mapped_column(
-        JSONB, comment="关键字参数"
+        CompatibleJSON, comment="关键字参数"
     )
     result: Mapped[Optional[Any]] = mapped_column(
-        JSONB, comment="任务结果"
+        CompatibleJSON, comment="任务结果"
     )
     
     # 执行信息

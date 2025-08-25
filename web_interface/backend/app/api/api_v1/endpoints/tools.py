@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, Body, Form, UploadFile, File
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -59,6 +59,9 @@ class DataPreprocessorRequest(BaseModel):
 
 class MarketDynamicsRequest(BaseModel):
     """市场动态建模请求模型"""
+    # 解决Pydantic字段命名冲突警告
+    model_config = ConfigDict(protected_namespaces=())
+    
     dataset: str = Field("BTC", description="数据集")
     start_date: str = Field("2020-01-01", description="开始日期")
     end_date: str = Field("2021-12-31", description="结束日期")

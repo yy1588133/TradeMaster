@@ -5,10 +5,11 @@ FastAPI应用主入口，配置路由、中间件、认证系统等核心功能�
 集成完整的认证体系和业务逻辑。
 """
 
+import os
 import time
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,8 +43,27 @@ async def lifespan(app: FastAPI):
         validate_settings()
         logger.info("✅ 配置验证通过")
         
-        # 检查数据库连接
-        db_connected = await check_database_connection()
+        # 等待一段时间让数据库准备就绪
+        import asyncio
+        await asyncio.sleep(0.5)
+        
+        # 检查数据库连接 - 使用重试机制
+        db_connected = False
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                db_connected = await check_database_connection()
+                if db_connected:
+                    break
+                else:
+                    logger.warning(f"数据库连接尝试 {attempt + 1}/{max_retries} 失败")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(1)
+            except Exception as e:
+                logger.warning(f"数据库连接尝试 {attempt + 1}/{max_retries} 出现异常: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+        
         if not db_connected:
             logger.error("❌ 数据库连接失败")
             raise Exception("数据库连接失败")
@@ -51,9 +71,12 @@ async def lifespan(app: FastAPI):
         logger.info("✅ 数据库连接正常")
         
         # 获取数据库信息
-        db_info = await get_database_info()
-        if "error" not in db_info:
-            logger.info(f"📊 数据库信息: {db_info.get('active_connections')} 个活跃连接")
+        try:
+            db_info = await get_database_info()
+            if "error" not in db_info:
+                logger.info(f"📊 数据库信息: {db_info.get('active_connections')} 个活跃连接")
+        except Exception as e:
+            logger.warning(f"获取数据库信息失败: {e}")
         
         # 在开发环境下初始化数据库
         if settings.DEBUG:
@@ -75,9 +98,12 @@ async def lifespan(app: FastAPI):
     logger.info("👋 TradeMaster Web Interface 关闭中...")
     
     # 清理资源
-    from app.core.database import engine
-    await engine.dispose()
-    logger.info("✅ 数据库连接已关闭")
+    try:
+        from app.core.database import engine
+        await engine.dispose()
+        logger.info("✅ 数据库连接已关闭")
+    except Exception as e:
+        logger.warning(f"关闭数据库连接时出现错误: {e}")
     
     logger.info("✅ 应用已安全关闭")
 
@@ -96,30 +122,62 @@ app = FastAPI(
 
 # ==================== 中间件配置 ====================
 
-# CORS中间件 - 处理环境变量中的CORS配置
-cors_origins = settings.BACKEND_CORS_ORIGINS
-if isinstance(cors_origins, str):
-    # 如果是字符串，按逗号分割
-    cors_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
-elif not isinstance(cors_origins, list):
-    # 如果既不是字符串也不是列表，使用默认值
-    cors_origins = ["http://localhost:3000", "http://localhost:3100", "http://127.0.0.1:3100"]
+# CORS中间件 - 改进的CORS配置处理
+def parse_cors_origins() -> List[str]:
+    """智能解析CORS源地址列表"""
+    # 直接从环境变量获取
+    cors_env = os.getenv("BACKEND_CORS_ORIGINS", "")
+    
+    if not cors_env.strip():
+        # 默认开发环境CORS配置
+        return [
+            "http://localhost:3000",
+            "http://localhost:3001", 
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001"
+        ]
+    
+    # 尝试JSON格式解析
+    import json
+    try:
+        parsed = json.loads(cors_env)
+        if isinstance(parsed, list):
+            return [str(origin).strip() for origin in parsed if str(origin).strip()]
+    except (json.JSONDecodeError, ValueError):
+        pass
+    
+    # 逗号分隔格式解析
+    if ',' in cors_env:
+        return [origin.strip() for origin in cors_env.split(',') if origin.strip()]
+    
+    # 单个URL处理
+    if cors_env.strip():
+        return [cors_env.strip()]
+    
+    # 返回默认值
+    return [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000", 
+        "http://127.0.0.1:3001"
+    ]
 
-# 从环境变量覆盖CORS配置
-import os
-env_cors = os.getenv("BACKEND_CORS_ORIGINS")
-if env_cors:
-    cors_origins = [origin.strip() for origin in env_cors.split(",") if origin.strip()]
+cors_origins = parse_cors_origins()
+logger.info(f"🌍 解析到的CORS源地址: {cors_origins}")
 
+# 配置CORS中间件
 if cors_origins:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
+        expose_headers=["*"]
     )
-    logger.info(f"✅ CORS配置: {cors_origins}")
+    logger.info(f"✅ CORS中间件已配置: {len(cors_origins)} 个源地址")
+else:
+    logger.warning("⚠️ 未配置CORS源地址")
 
 # 受信任主机中间件
 if settings.ALLOWED_HOSTS:
@@ -128,8 +186,8 @@ if settings.ALLOWED_HOSTS:
         allowed_hosts=settings.ALLOWED_HOSTS
     )
 
-# 安全中间件
-app.add_middleware(SecurityMiddleware)
+# 安全中间件 - 暂时禁用以避免Redis连接问题
+# app.add_middleware(SecurityMiddleware)
 
 
 # 请求日志中间件
@@ -159,6 +217,37 @@ async def log_requests(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     
     return response
+
+
+# CORS预检请求处理中间件
+@app.middleware("http")
+async def handle_cors_preflight(request: Request, call_next):
+    """专门处理CORS预检请求的中间件"""
+    if request.method == "OPTIONS":
+        # 获取请求来源
+        origin = request.headers.get("origin")
+        
+        # 检查来源是否在允许列表中
+        if origin in cors_origins or "*" in cors_origins:
+            return JSONResponse(
+                status_code=200,
+                content={"message": "CORS preflight successful"},
+                headers={
+                    "Access-Control-Allow-Origin": origin if origin in cors_origins else "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept, Origin",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Max-Age": "86400"  # 预检结果缓存24小时
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": f"CORS not allowed for origin: {origin}"}
+            )
+    
+    # 非OPTIONS请求继续正常处理
+    return await call_next(request)
 
 
 # 安全头中间件

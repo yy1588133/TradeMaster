@@ -66,29 +66,40 @@ def create_database_engine() -> AsyncEngine:
         pool_recycle = 1800  # 30分钟回收连接
         pool_pre_ping = True
     
-    # 创建引擎
-    engine = create_async_engine(
-        database_url,
-        # 连接池配置 (异步引擎自动选择合适的连接池)
-        pool_size=pool_size,
-        max_overflow=max_overflow,
-        pool_timeout=pool_timeout,
-        pool_recycle=pool_recycle,
-        pool_pre_ping=pool_pre_ping,
-        
-        # 性能配置
-        echo=settings.DEBUG,  # 开发环境输出SQL日志
-        echo_pool=False,  # 不输出连接池日志
-        future=True,  # 使用SQLAlchemy 2.0风格
-        
-        # 连接参数
-        connect_args={
-            "server_settings": {
-                "application_name": "TradeMaster_Web_Interface",
-            },
-            "command_timeout": 60,
-        }
-    )
+    # 检查是否使用SQLite
+    is_sqlite = database_url.startswith('sqlite')
+    
+    if is_sqlite:
+        # SQLite配置 - 不支持连接池参数
+        engine = create_async_engine(
+            database_url,
+            echo=False,  # 关闭SQL日志以减少输出
+            future=True,  # 使用SQLAlchemy 2.0风格
+        )
+    else:
+        # PostgreSQL配置 - 使用连接池
+        engine = create_async_engine(
+            database_url,
+            # 连接池配置 (异步引擎自动选择合适的连接池)
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+            pool_recycle=pool_recycle,
+            pool_pre_ping=pool_pre_ping,
+            
+            # 性能配置
+            echo=settings.SQLALCHEMY_LOG_LEVEL.upper() == 'DEBUG',  # 只在DEBUG级别输出SQL日志
+            echo_pool=False,  # 不输出连接池日志
+            future=True,  # 使用SQLAlchemy 2.0风格
+            
+            # 连接参数
+            connect_args={
+                "server_settings": {
+                    "application_name": "TradeMaster_Web_Interface",
+                },
+                "command_timeout": 60,
+            }
+        )
     
     return engine
 
@@ -204,29 +215,63 @@ async def get_database_info() -> dict:
     """
     try:
         async with get_db_session() as session:
-            # 获取PostgreSQL版本
-            version_result = await session.execute(text("SELECT version()"))
-            version = version_result.scalar()
+            # 检查数据库类型
+            database_url = settings.get_database_url(async_driver=True)
+            is_sqlite = database_url.startswith('sqlite')
             
-            # 获取当前连接数
-            conn_result = await session.execute(text(
-                "SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"
-            ))
-            active_connections = conn_result.scalar()
-            
-            # 获取数据库大小
-            size_result = await session.execute(text(
-                f"SELECT pg_size_pretty(pg_database_size('{settings.POSTGRES_DB}'))"
-            ))
-            database_size = size_result.scalar()
-            
-            return {
-                "version": version,
-                "active_connections": active_connections,
-                "database_size": database_size,
-                "pool_size": engine.pool.size(),
-                "checked_out_connections": engine.pool.checkedout(),
-            }
+            if is_sqlite:
+                # SQLite特定查询
+                version_result = await session.execute(text("SELECT sqlite_version()"))
+                version = f"SQLite {version_result.scalar()}"
+                
+                # SQLite单连接，活跃连接固定为1
+                active_connections = 1
+                
+                # 获取数据库文件大小（如果是文件数据库）
+                import os
+                if ':///' in database_url:
+                    db_path = database_url.split(':///')[-1]
+                    if os.path.exists(db_path):
+                        size_bytes = os.path.getsize(db_path)
+                        database_size = f"{size_bytes / 1024 / 1024:.2f} MB"
+                    else:
+                        database_size = "0 MB"
+                else:
+                    database_size = "内存数据库"
+                
+                return {
+                    "version": version,
+                    "active_connections": active_connections,
+                    "database_size": database_size,
+                    "database_type": "SQLite",
+                    "pool_size": "N/A (单连接)",
+                    "checked_out_connections": "N/A",
+                }
+            else:
+                # PostgreSQL特定查询
+                version_result = await session.execute(text("SELECT version()"))
+                version = version_result.scalar()
+                
+                # 获取当前连接数
+                conn_result = await session.execute(text(
+                    "SELECT count(*) FROM pg_stat_activity WHERE state = 'active'"
+                ))
+                active_connections = conn_result.scalar()
+                
+                # 获取数据库大小
+                size_result = await session.execute(text(
+                    f"SELECT pg_size_pretty(pg_database_size('{settings.POSTGRES_DB}'))"
+                ))
+                database_size = size_result.scalar()
+                
+                return {
+                    "version": version,
+                    "active_connections": active_connections,
+                    "database_size": database_size,
+                    "database_type": "PostgreSQL",
+                    "pool_size": engine.pool.size(),
+                    "checked_out_connections": engine.pool.checkedout(),
+                }
     except Exception as e:
         logger.error(f"获取数据库信息失败: {e}")
         return {"error": str(e)}
