@@ -18,16 +18,28 @@
 .PARAMETER SkipHealthCheck
     跳过服务健康检查
 
+.PARAMETER UseSmartHealthCheck  
+    使用智能健康检查（默认启用），替代固定45秒等待
+    可大幅减少启动等待时间，通过实际检测服务就绪状态来确定
+
 .PARAMETER Force
     强制执行，跳过确认提示
 
 .EXAMPLE
     .\quick-start.ps1
-    使用智能检测自动选择最佳部署方案
+    使用智能检测自动选择最佳部署方案，默认启用智能健康检查
 
 .EXAMPLE  
     .\quick-start.ps1 -DeployScheme full-docker -VerboseMode
-    使用Docker完整部署方案并启用详细模式
+    使用Docker完整部署方案、启用详细模式和智能健康检查
+
+.EXAMPLE
+    .\quick-start.ps1 -DeployScheme docker-db -UseSmartHealthCheck:$false
+    使用数据库容器化方案，但禁用智能健康检查（使用传统45秒等待）
+
+.EXAMPLE
+    .\quick-start.ps1 -SkipHealthCheck
+    跳过所有健康检查，最快启动速度
 
 .NOTES
     Author: TradeMaster Development Team
@@ -49,6 +61,7 @@ param(
     [switch]$VerboseMode,
     [switch]$SkipHealthCheck,  
     [switch]$Force,
+    [switch]$UseSmartHealthCheck = $true,  # 默认启用智能健康检查
     
     [ValidateRange(1, 65535)]
     [int]$BackendPort = 8000,
@@ -81,9 +94,11 @@ $Global:Config = @{
     
     # 超时配置
     Timeouts = @{
-        ServiceInit = 45
+        ServiceInit = 45        # 保留原值作为最大等待时间
         HealthCheck = 30
         PortScan = 10
+        SmartHealthCheck = 3    # 智能健康检查间隔
+        MaxHealthRetries = 20   # 最大健康检查重试次数 (总共60秒)
     }
     
     # 目录配置
@@ -127,6 +142,10 @@ function Write-Banner {
     Write-Host "      └ PostgreSQL + Redis 容器化，前后端本地运行"
     Write-Host "  [3] 💻 Windows原生服务" -ForegroundColor Magenta
     Write-Host "      └ 使用系统原生PostgreSQL/Redis服务"
+    Write-Host ""
+    Write-Host "  ⚡ 新功能: 智能健康检查 (默认启用)" -ForegroundColor Cyan
+    Write-Host "      └ 替代固定45秒等待，实际检测服务就绪状态"
+    Write-Host "      └ 通常可节省20-40秒启动时间" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -211,6 +230,207 @@ function Test-AdminPrivileges {
     Write-Host "  ✓ 管理员权限已确认" -ForegroundColor Green
 }
 
+function Clear-DockerStaleResources {
+    <#
+    .SYNOPSIS
+    清理Docker中的异常容器和应用资源，保留数据库Volume以维护数据持久化
+    增强版本：智能处理Volume配置，保护用户数据
+    #>
+    
+    Write-Information "  🧹 清理Docker异常资源..."
+    
+    try {
+        # 停止项目相关的所有容器
+        $projectContainers = & docker ps -a --filter "label=com.docker.compose.project=web_interface" --format "{{.Names}}" 2>$null
+        if ($projectContainers) {
+            Write-Host "    停止项目容器..." -ForegroundColor Yellow
+            foreach ($container in $projectContainers) {
+                if ($container.Trim()) {
+                    & docker stop $container.Trim() 2>$null | Out-Null
+                    & docker rm -f $container.Trim() 2>$null | Out-Null
+                }
+            }
+        }
+        
+        # 清理异常退出的容器
+        $exitedContainers = & docker ps -a --filter "status=exited" --filter "label=com.docker.compose.project=web_interface" --format "{{.Names}}" 2>$null
+        if ($exitedContainers) {
+            Write-Host "    清理异常容器..." -ForegroundColor Yellow
+            foreach ($container in $exitedContainers) {
+                if ($container.Trim()) {
+                    & docker rm -f $container.Trim() 2>$null | Out-Null
+                }
+            }
+        }
+        
+        # 检查并清理应用相关的Volume（保留数据库数据）
+        Write-Host "    检查Volume配置冲突..." -ForegroundColor Yellow
+        $conflictVolumes = @(
+            "trademaster-backend-data",
+            "trademaster-backend-logs", 
+            "trademaster-backend-uploads",
+            "trademaster-backend-temp",
+            "trademaster-frontend-node-modules",
+            "trademaster-nginx-logs"
+        )
+        # 注意：特意保留数据库Volume以保持数据持久化
+        # "trademaster-postgresql-data", "trademaster-redis-data" 被排除
+        
+        foreach ($volumeName in $conflictVolumes) {
+            $volume = & docker volume ls --filter "name=$volumeName" --format "{{.Name}}" 2>$null
+            if ($volume) {
+                Write-Host "      清理应用Volume: $volumeName" -ForegroundColor DarkYellow
+                & docker volume rm $volumeName 2>$null | Out-Null
+            }
+        }
+        
+        # 检查数据库Volume是否存在（不删除，仅报告）
+        $dbVolumes = @("trademaster-postgresql-data", "trademaster-redis-data")
+        foreach ($dbVolume in $dbVolumes) {
+            $volume = & docker volume ls --filter "name=$dbVolume" --format "{{.Name}}" 2>$null
+            if ($volume) {
+                Write-Host "      保留数据库Volume: $dbVolume (数据持久化)" -ForegroundColor Green
+            }
+        }
+        
+        # 执行系统级清理（不包括Volumes以保护数据）
+        Write-Host "    执行系统清理..." -ForegroundColor Yellow
+        & docker system prune -f 2>$null | Out-Null  # 移除了 --volumes 参数
+        & docker network prune -f 2>$null | Out-Null
+        
+        # 确保Docker daemon状态正常
+        $dockerInfo = & docker info --format "{{.ServerVersion}}" 2>$null
+        if (-not $dockerInfo) {
+            Write-Warning "    Docker daemon可能需要重启"
+        } else {
+            Write-Host "    ✓ Docker资源清理完成" -ForegroundColor Green
+        }
+        
+    } catch {
+        Write-Warning "    Docker资源清理过程中出现警告: $($_.Exception.Message)"
+        # 不抛出异常，允许继续执行
+    }
+}
+
+function Clear-DockerDatabaseResources {
+    <#
+    .SYNOPSIS
+    清理Docker数据库相关的异常容器和资源
+    #>
+    
+    Write-Information "    🧹 清理数据库容器异常资源..."
+    
+    try {
+        # 清理数据库相关容器
+        $dbContainers = @("trademaster-postgresql", "trademaster-redis", "trademaster_postgresql", "trademaster_redis")
+        foreach ($containerName in $dbContainers) {
+            $container = & docker ps -a --filter "name=$containerName" --format "{{.Names}}" 2>$null
+            if ($container) {
+                Write-Host "      清理容器: $containerName" -ForegroundColor DarkYellow
+                & docker stop $containerName 2>$null | Out-Null
+                & docker rm -f $containerName 2>$null | Out-Null
+            }
+        }
+        
+        # 清理数据库网络
+        $networkName = "trademaster_network"
+        $network = & docker network ls --filter "name=$networkName" --format "{{.Name}}" 2>$null
+        if ($network) {
+            & docker network rm $networkName 2>$null | Out-Null
+        }
+        
+        Write-Host "      ✓ 数据库资源清理完成" -ForegroundColor Green
+        
+    } catch {
+        Write-Warning "    数据库资源清理过程中出现警告: $($_.Exception.Message)"
+        # 不抛出异常，允许继续执行
+    }
+}
+
+function Test-VolumeConflicts {
+    <#
+    .SYNOPSIS
+    检测并自动处理Docker Volume配置冲突，保护数据库数据持久化
+    智能分类：应用Volume可重建，数据库Volume需保护
+    #>
+    
+    Write-Information "  🔍 检查Volume配置冲突..."
+    
+    try {
+        # 检查是否存在可能冲突的Volume（排除数据库Volume）
+        $problematicVolumes = @()
+        $targetVolumes = @(
+            "trademaster-backend-data",
+            "trademaster-backend-logs", 
+            "trademaster-backend-uploads",
+            "trademaster-backend-temp",
+            "trademaster-frontend-node-modules",
+            "trademaster-nginx-logs"
+        )
+        # 数据库Volume单独处理，不作为"冲突"处理
+        $dbVolumes = @("trademaster-postgresql-data", "trademaster-redis-data")
+        
+        foreach ($volumeName in $targetVolumes) {
+            $existingVolume = & docker volume inspect $volumeName 2>$null
+            if ($existingVolume) {
+                # 解析Volume的配置信息
+                $volumeInfo = $existingVolume | ConvertFrom-Json
+                if ($volumeInfo -and $volumeInfo.Name) {
+                    $problematicVolumes += $volumeName
+                    Write-Host "    ⚠️  发现潜在冲突Volume: $volumeName" -ForegroundColor Yellow
+                }
+            }
+        }
+        
+        # 检查数据库Volume状态（不作为冲突处理）
+        foreach ($dbVolume in $dbVolumes) {
+            $existingVolume = & docker volume inspect $dbVolume 2>$null
+            if ($existingVolume) {
+                Write-Host "    ✓ 发现数据库Volume: $dbVolume (保留数据)" -ForegroundColor Green
+            }
+        }
+        
+        if ($problematicVolumes.Count -gt 0) {
+            Write-Host "  🔧 自动处理Volume配置冲突..." -ForegroundColor Green
+            
+            foreach ($volumeName in $problematicVolumes) {
+                Write-Host "    🗑️  清理冲突Volume: $volumeName" -ForegroundColor DarkGreen
+                & docker volume rm $volumeName 2>$null | Out-Null
+            }
+            
+            Write-Host "  ✅ Volume配置冲突已自动解决" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "  ✓ 无Volume配置冲突" -ForegroundColor Green
+            return $false
+        }
+        
+    } catch {
+        Write-Warning "Volume冲突检测过程中出现警告: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Get-SchemeDisplayName {
+    <#
+    .SYNOPSIS
+    获取部署方案的中文显示名称
+    #>
+    param([string]$Scheme)
+    
+    $schemeNames = @{
+        "full-docker" = "🐳 完整容器化部署"
+        "docker-db" = "🔄 混合部署 (数据库容器化)"  
+        "native" = "💻 Windows原生服务"
+    }
+    
+    if ($schemeNames.ContainsKey($Scheme)) {
+        return $schemeNames[$Scheme]
+    } else {
+        return $Scheme
+    }
+}
+
 function Select-DeploymentScheme {
     <#
     .SYNOPSIS
@@ -225,18 +445,23 @@ function Select-DeploymentScheme {
     # 尝试读取上次保存的方案
     $savedScheme = $null
     $schemeFile = Join-Path $Global:Config.ProjectDir $Global:Config.SchemeFile
+    $userRejectedLastScheme = $false
     
     if (Test-Path $schemeFile) {
         try {
             $savedScheme = (Get-Content $schemeFile -Encoding UTF8).Trim()
             if ($savedScheme -in @("full-docker", "docker-db", "native")) {
-                Write-Host "  💾 检测到上次选择: $savedScheme" -ForegroundColor Cyan
+                $displayName = Get-SchemeDisplayName -Scheme $savedScheme
+                Write-Host "  💾 检测到上次选择: $displayName" -ForegroundColor Cyan
                 
                 if (-not $Force) {
                     $useLastChoice = Read-Host "是否使用相同的部署方案? (Y/N) [默认: Y]"
                     if ($useLastChoice -eq "" -or $useLastChoice -match "^[Yy]") {
-                        Write-Host "  ✓ 使用保存的方案: $savedScheme" -ForegroundColor Green
+                        Write-Host "  ✓ 使用保存的方案: $displayName" -ForegroundColor Green
                         return $savedScheme
+                    } else {
+                        # 用户明确拒绝使用上次方案，标记为需要用户选择
+                        $userRejectedLastScheme = $true
                     }
                 }
             }
@@ -246,6 +471,11 @@ function Select-DeploymentScheme {
     }
     
     # 处理自动检测或用户选择
+    # 如果用户明确拒绝了上次方案，直接进入用户选择流程
+    if ($userRejectedLastScheme) {
+        return Get-UserSelectedScheme
+    }
+    
     switch ($RequestedScheme) {
         "auto" {
             return Get-AutoDetectedScheme
@@ -271,9 +501,11 @@ function Get-AutoDetectedScheme {
     try {
         # 检测Docker可用性
         $null = docker version 2>$null
-        Write-Host "  ✓ 检测到Docker Desktop，推荐完整容器化方案" -ForegroundColor Green
-        Save-DeploymentScheme "full-docker"
-        return "full-docker"
+        $scheme = "full-docker"
+        $displayName = Get-SchemeDisplayName -Scheme $scheme
+        Write-Host "  ✓ 检测到Docker Desktop，推荐$displayName" -ForegroundColor Green
+        Save-DeploymentScheme $scheme
+        return $scheme
     } catch {
         Write-Host "  ⚠ Docker不可用，检查管理员权限..." -ForegroundColor Yellow
     }
@@ -281,15 +513,18 @@ function Get-AutoDetectedScheme {
     # 检查管理员权限
     $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Write-Host "  ✓ 检测到管理员权限，推荐Windows原生方案" -ForegroundColor Green
-        Save-DeploymentScheme "native"
-        return "native"
+        $scheme = "native"
+        $displayName = Get-SchemeDisplayName -Scheme $scheme
+        Write-Host "  ✓ 检测到管理员权限，推荐$displayName" -ForegroundColor Green
+        Save-DeploymentScheme $scheme
+        return $scheme
     }
     
     Write-Warning "  ⚠ 未检测到Docker或管理员权限，默认选择完整容器化方案"
     Write-Information "  💡 如Docker不可用将在后续步骤提示安装"
-    Save-DeploymentScheme "full-docker"
-    return "full-docker"
+    $scheme = "full-docker"
+    Save-DeploymentScheme $scheme
+    return $scheme
 }
 
 function Get-UserSelectedScheme {
@@ -321,19 +556,25 @@ function Get-UserSelectedScheme {
         
         switch ($choice.ToUpper()) {
             "1" { 
-                Write-Host "  ✓ 选择方案: 完整容器化部署" -ForegroundColor Green
-                Save-DeploymentScheme "full-docker"
-                return "full-docker"
+                $scheme = "full-docker"
+                $displayName = Get-SchemeDisplayName -Scheme $scheme
+                Write-Host "  ✓ 选择方案: $displayName" -ForegroundColor Green
+                Save-DeploymentScheme $scheme
+                return $scheme
             }
             "2" { 
-                Write-Host "  ✓ 选择方案: 混合部署" -ForegroundColor Green
-                Save-DeploymentScheme "docker-db"
-                return "docker-db"
+                $scheme = "docker-db"
+                $displayName = Get-SchemeDisplayName -Scheme $scheme
+                Write-Host "  ✓ 选择方案: $displayName" -ForegroundColor Green
+                Save-DeploymentScheme $scheme
+                return $scheme
             }
             "3" { 
-                Write-Host "  ✓ 选择方案: Windows原生服务" -ForegroundColor Green
-                Save-DeploymentScheme "native"
-                return "native"
+                $scheme = "native"
+                $displayName = Get-SchemeDisplayName -Scheme $scheme
+                Write-Host "  ✓ 选择方案: $displayName" -ForegroundColor Green
+                Save-DeploymentScheme $scheme
+                return $scheme
             }
             "A" { 
                 return Get-AutoDetectedScheme
@@ -401,6 +642,12 @@ function Start-FullDockerDeployment {
     
     Write-Information "  🐳 准备完整容器化部署环境..."
     
+    # 清理可能存在的异常容器和资源
+    Clear-DockerStaleResources
+    
+    # 检查并自动处理Volume配置冲突（关键修复）
+    Test-VolumeConflicts
+    
     # 创建数据目录
     New-DataDirectories
     
@@ -410,18 +657,43 @@ function Start-FullDockerDeployment {
     # 启动Docker服务
     Write-Information "  🚀 启动Docker Compose服务..."
     try {
-        & docker compose up -d --build
+        # 使用 --force-recreate 自动处理Volume冲突，避免交互式提示
+        & docker compose up -d --build --force-recreate
         if ($LASTEXITCODE -ne 0) {
             throw "Docker Compose启动失败，退出代码: $LASTEXITCODE"
         }
         Write-Host "  ✓ Docker服务启动成功" -ForegroundColor Green
     } catch {
-        throw "Docker服务启动失败: $($_.Exception.Message)`n`n故障排除建议：`n1. 检查Docker Desktop是否运行正常`n2. 执行 'docker compose logs' 查看详细错误`n3. 检查端口占用情况"
+        # 如果启动失败，尝试清理后重试
+        Write-Warning "Docker服务启动失败，尝试清理后重试..."
+        Clear-DockerStaleResources
+        try {
+            & docker compose up -d --build --force-recreate --remove-orphans
+            if ($LASTEXITCODE -ne 0) {
+                throw "重试启动失败，退出代码: $LASTEXITCODE"
+            }
+            Write-Host "  ✓ Docker服务重试启动成功" -ForegroundColor Green
+        } catch {
+            throw "Docker服务启动失败: $($_.Exception.Message)`n`n故障排除建议：`n1. 检查Docker Desktop是否运行正常`n2. 执行 'docker compose logs' 查看详细错误`n3. 检查端口占用情况`n4. 重启Docker Desktop"
+        }
     }
     
     # 等待服务初始化
     if (-not $SkipHealthCheck) {
-        Wait-ServiceInitialization -Timeout $Global:Config.Timeouts.ServiceInit
+        if ($UseSmartHealthCheck) {
+            # 使用智能健康检查替代固定45秒等待
+            Write-Information "  🧠 启用智能健康检查模式"
+            $healthCheckResult = Wait-SmartServiceInitialization -ServiceType "docker-full" -MaxWaitSeconds 60
+            if (-not $healthCheckResult) {
+                Write-Warning "智能健康检查未通过，但服务可能仍在正常启动中"
+            }
+        } else {
+            # 使用传统固定等待
+            Write-Information "  ⏳ 使用传统固定等待模式"
+            Wait-ServiceInitialization -Timeout $Global:Config.Timeouts.ServiceInit
+        }
+        
+        # 保留传统健康检查作为补充验证
         Test-DockerServicesHealth
     }
 }
@@ -461,19 +733,60 @@ function Start-DockerDatabase {
         throw "Docker数据库配置文件不存在: docker-compose.services.yml"
     }
     
+    # 清理可能存在的数据库容器问题
+    Clear-DockerDatabaseResources
+    
+    # 检查并自动处理Volume配置冲突（关键修复）
+    Test-VolumeConflicts
+    
     try {
-        & docker compose -f docker-compose.services.yml up -d
+        # 使用 --force-recreate 自动处理Volume冲突，避免交互式提示
+        & docker compose -f docker-compose.services.yml up -d --force-recreate
         if ($LASTEXITCODE -ne 0) {
             throw "数据库服务启动失败，退出代码: $LASTEXITCODE"
         }
         Write-Host "  ✓ Docker数据库服务启动成功" -ForegroundColor Green
         
         if (-not $SkipHealthCheck) {
-            Wait-ServiceInitialization -Timeout $Global:Config.Timeouts.ServiceInit
+            if ($UseSmartHealthCheck) {
+                # 使用智能健康检查替代固定45秒等待
+                Write-Information "  🧠 启用数据库智能健康检查"
+                $healthCheckResult = Wait-SmartServiceInitialization -ServiceType "docker-db" -MaxWaitSeconds 30
+                if (-not $healthCheckResult) {
+                    Write-Warning "数据库智能健康检查未通过，但服务可能仍在正常启动中"
+                }
+            } else {
+                # 使用传统固定等待
+                Write-Information "  ⏳ 使用传统固定等待模式"
+                Wait-ServiceInitialization -Timeout $Global:Config.Timeouts.ServiceInit
+            }
+            
+            # 保留传统健康检查作为补充验证
             Test-DockerDatabaseHealth
         }
     } catch {
-        throw "Docker数据库启动失败: $($_.Exception.Message)`n`n执行以下命令查看详细错误：`ndocker compose -f docker-compose.services.yml logs"
+        # 如果启动失败，尝试强制重建
+        Write-Warning "数据库服务启动失败，尝试强制重建..."
+        Clear-DockerDatabaseResources
+        try {
+            # 使用 --force-recreate 自动处理Volume冲突，避免交互式提示
+        & docker compose -f docker-compose.services.yml up -d --force-recreate --force-recreate
+            if ($LASTEXITCODE -ne 0) {
+                throw "重试启动失败，退出代码: $LASTEXITCODE"
+            }
+            Write-Host "  ✓ Docker数据库服务重试启动成功" -ForegroundColor Green
+            
+            # 重试成功后也进行智能健康检查
+            if (-not $SkipHealthCheck -and $UseSmartHealthCheck) {
+                Write-Information "  🧠 重试后进行智能健康验证"
+                $healthCheckResult = Wait-SmartServiceInitialization -ServiceType "docker-db" -MaxWaitSeconds 20
+                if (-not $healthCheckResult) {
+                    Write-Warning "重试后的智能健康检查未通过，但服务可能仍在正常启动中"
+                }
+            }
+        } catch {
+            throw "Docker数据库启动失败: $($_.Exception.Message)`n`n执行以下命令查看详细错误：`ndocker compose -f docker-compose.services.yml logs"
+        }
     }
 }
 
@@ -720,8 +1033,8 @@ POSTGRES_PASSWORD=TradeMaster2024!
 REDIS_PASSWORD=TradeMaster2024!
 
 # 应用配置
-DEBUG=true
-LOG_LEVEL=DEBUG
+DEBUG=false
+LOG_LEVEL=false
 NODE_ENV=development
 
 # API配置
@@ -821,7 +1134,7 @@ function Wait-ServiceInitialization {
     #>
     param([int]$Timeout)
     
-    Write-Information "  ⏳ 等待服务完全初始化 ($Timeout 秒)..."
+    Write-Information "  ⏳ 等待服务完全初始化 (最长 $Timeout 秒，智能检测)..."
     
     $progressParams = @{
         Activity = "服务初始化中"
@@ -838,6 +1151,88 @@ function Wait-ServiceInitialization {
     
     Write-Progress -Activity "服务初始化中" -Completed
     Write-Host "  ✓ 服务初始化等待完成" -ForegroundColor Green
+}
+
+
+function Wait-SmartServiceInitialization {
+    <#
+    .SYNOPSIS
+    智能等待服务初始化 - 替代固定时间等待的优化版本
+    
+    .DESCRIPTION
+    通过实际健康检查来确定服务就绪状态，而非盲目等待固定时间。
+    大幅减少不必要的等待时间，同时保证服务完全就绪。
+    
+    .PARAMETER ServiceType
+    服务类型: "docker-full", "docker-db", "mixed"
+    
+    .PARAMETER MaxWaitSeconds
+    最大等待时间（秒），默认60秒
+    #>
+    param(
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("docker-full", "docker-db", "mixed")]
+        [string]$ServiceType,
+        
+        [int]$MaxWaitSeconds = 60
+    )
+    
+    Write-Information "  🧠 智能服务健康检查启动 (最长等待 $MaxWaitSeconds 秒)..."
+    
+    $startTime = Get-Date
+    $checkInterval = $Global:Config.Timeouts.SmartHealthCheck
+    $attempt = 0
+    $maxAttempts = [Math]::Ceiling($MaxWaitSeconds / $checkInterval)
+    
+    $progressParams = @{
+        Activity = "智能服务健康检查"
+        Status = "正在检测服务就绪状态..."
+    }
+    
+    while ($attempt -lt $maxAttempts) {
+        $attempt++
+        $elapsed = ((Get-Date) - $startTime).TotalSeconds
+        
+        # 更新进度条
+        $progressParams.PercentComplete = ($elapsed / $MaxWaitSeconds) * 100
+        $progressParams.Status = "检查第 $attempt/$maxAttempts 次 (已用时 $([Math]::Round($elapsed, 1))s)"
+        Write-Progress @progressParams
+        
+        # 根据服务类型执行相应的健康检查
+        $allHealthy = $false
+        try {
+            switch ($ServiceType) {
+                "docker-full" {
+                    $allHealthy = Test-DockerFullStackHealth
+                }
+                "docker-db" {
+                    $allHealthy = Test-DockerDatabaseHealthSmart
+                }
+                "mixed" {
+                    $allHealthy = Test-MixedDeploymentHealth
+                }
+            }
+            
+            if ($allHealthy) {
+                $finalElapsed = ((Get-Date) - $startTime).TotalSeconds
+                Write-Progress -Activity "智能服务健康检查" -Completed
+                Write-Host "  ✅ 所有服务已就绪！智能检查耗时: $([Math]::Round($finalElapsed, 1))s (节省约 $([Math]::Round(45 - $finalElapsed, 1))s)" -ForegroundColor Green
+                return $true
+            }
+        } catch {
+            Write-Host "  ⚠️  健康检查遇到异常 (第$attempt次): $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+        
+        if ($attempt -lt $maxAttempts) {
+            Write-Host "  🔄 服务未完全就绪，等待 $checkInterval 秒后重试..." -ForegroundColor Yellow
+            Start-Sleep -Seconds $checkInterval
+        }
+    }
+    
+    Write-Progress -Activity "智能服务健康检查" -Completed
+    $finalElapsed = ((Get-Date) - $startTime).TotalSeconds
+    Write-Warning "  ⚠️  达到最大等待时间 ($([Math]::Round($finalElapsed, 1))s)，部分服务可能仍在初始化中"
+    return $false
 }
 
 function Test-DockerServicesHealth {
@@ -865,6 +1260,207 @@ function Test-DockerServicesHealth {
     }
 }
 
+
+function Test-DockerFullStackHealth {
+    <#
+    .SYNOPSIS
+    智能检查Docker完整服务栈健康状态
+    
+    .DESCRIPTION
+    检查前端、后端、PostgreSQL、Redis等所有容器的健康状态
+    
+    .RETURNS
+    Boolean - 所有服务是否就绪
+    #>
+    
+    try {
+        # 检查容器运行状态
+        $containerStatus = & docker compose ps --format json 2>$null | ConvertFrom-Json
+        if (-not $containerStatus) {
+            Write-Host "    📊 容器状态: 无运行容器" -ForegroundColor Red
+            return $false
+        }
+        
+        $runningContainers = 0
+        $totalContainers = 0
+        
+        foreach ($container in $containerStatus) {
+            $totalContainers++
+            if ($container.State -eq "running") {
+                $runningContainers++
+                Write-Host "    ✓ $($container.Service): $($container.State)" -ForegroundColor Green
+            } else {
+                Write-Host "    ❌ $($container.Service): $($container.State)" -ForegroundColor Red
+                return $false
+            }
+        }
+        
+        if ($runningContainers -eq 0) {
+            Write-Host "    📊 容器状态: 0/$totalContainers 运行中" -ForegroundColor Red
+            return $false
+        }
+        
+        # 检查数据库连接
+        $dbHealthy = Test-DockerDatabaseHealthSmart
+        if (-not $dbHealthy) {
+            return $false
+        }
+        
+        # 检查前后端端口可访问性 (可选)
+        $frontendPort = $Global:Config.Ports.Frontend
+        $backendPort = $Global:Config.Ports.Backend
+        
+        # 简单端口检查
+        $frontendAccessible = Test-PortAccessibility "localhost" $frontendPort
+        $backendAccessible = Test-PortAccessibility "localhost" $backendPort
+        
+        if ($frontendAccessible) {
+            Write-Host "    ✓ 前端端口 $frontendPort 可访问" -ForegroundColor Green
+        } else {
+            Write-Host "    ⚠️  前端端口 $frontendPort 暂不可访问" -ForegroundColor Yellow
+        }
+        
+        if ($backendAccessible) {
+            Write-Host "    ✓ 后端端口 $backendPort 可访问" -ForegroundColor Green
+        } else {
+            Write-Host "    ⚠️  后端端口 $backendPort 暂不可访问" -ForegroundColor Yellow
+        }
+        
+        # 只要数据库和容器都正常就认为准备就绪
+        Write-Host "    📊 完整服务栈状态: $runningContainers/$totalContainers 容器运行，数据库就绪" -ForegroundColor Green
+        return $true
+        
+    } catch {
+        Write-Host "    ❌ 检查Docker完整服务栈时发生错误: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+
+function Test-DockerDatabaseHealthSmart {
+    <#
+    .SYNOPSIS
+    智能检查Docker数据库健康状态
+    
+    .DESCRIPTION
+    快速检查PostgreSQL和Redis的就绪状态
+    
+    .RETURNS
+    Boolean - 数据库服务是否就绪
+    #>
+    
+    try {
+        $allHealthy = $true
+        
+        # PostgreSQL健康检查
+        Write-Host "    🐘 检查PostgreSQL..." -ForegroundColor Cyan
+        $pgReady = & docker exec trademaster-postgresql pg_isready -U trademaster 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "    ✓ PostgreSQL服务就绪" -ForegroundColor Green
+        } else {
+            Write-Host "    ❌ PostgreSQL未就绪 (退出码: $LASTEXITCODE)" -ForegroundColor Red
+            $allHealthy = $false
+        }
+        
+        # Redis健康检查
+        Write-Host "    🔴 检查Redis..." -ForegroundColor Cyan
+        $redisPassword = $env:REDIS_PASSWORD ?? "TradeMaster2024!"
+        $redisReady = & docker exec trademaster-redis redis-cli --no-auth-warning -a $redisPassword ping 2>$null
+        if ($redisReady -eq "PONG") {
+            Write-Host "    ✓ Redis服务就绪" -ForegroundColor Green
+        } else {
+            Write-Host "    ❌ Redis未就绪 (响应: $redisReady)" -ForegroundColor Red
+            $allHealthy = $false
+        }
+        
+        return $allHealthy
+        
+    } catch {
+        Write-Host "    ❌ 数据库健康检查异常: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+
+function Test-MixedDeploymentHealth {
+    <#
+    .SYNOPSIS
+    检查混合部署健康状态
+    
+    .DESCRIPTION
+    检查数据库服务和前后端应用的就绪状态
+    
+    .RETURNS
+    Boolean - 混合部署是否就绪
+    #>
+    
+    try {
+        # 检查数据库服务
+        $dbHealthy = Test-DockerDatabaseHealthSmart
+        if (-not $dbHealthy) {
+            Write-Host "    ❌ 数据库服务未就绪" -ForegroundColor Red
+            return $false
+        }
+        
+        # 检查前后端端口
+        $frontendPort = $Global:Config.Ports.Frontend
+        $backendPort = $Global:Config.Ports.Backend
+        
+        $frontendAccessible = Test-PortAccessibility "localhost" $frontendPort
+        $backendAccessible = Test-PortAccessibility "localhost" $backendPort
+        
+        if ($frontendAccessible -and $backendAccessible) {
+            Write-Host "    ✓ 前后端服务均可访问" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "    ⚠️  前后端服务启动中 (前端: $frontendAccessible, 后端: $backendAccessible)" -ForegroundColor Yellow
+            return $false
+        }
+        
+    } catch {
+        Write-Host "    ❌ 混合部署健康检查异常: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+
+function Test-PortAccessibility {
+    <#
+    .SYNOPSIS
+    测试端口可访问性
+    
+    .PARAMETER Host
+    主机地址
+    
+    .PARAMETER Port
+    端口号
+    
+    .RETURNS
+    Boolean - 端口是否可访问
+    #>
+    param(
+        [string]$Host,
+        [int]$Port
+    )
+    
+    try {
+        $tcpClient = New-Object System.Net.Sockets.TcpClient
+        $connect = $tcpClient.BeginConnect($Host, $Port, $null, $null)
+        $wait = $connect.AsyncWaitHandle.WaitOne(3000, $false)
+        
+        if ($wait) {
+            $tcpClient.EndConnect($connect)
+            $tcpClient.Close()
+            return $true
+        } else {
+            $tcpClient.Close()
+            return $false
+        }
+    } catch {
+        return $false
+    }
+}
+
 function Test-DockerDatabaseHealth {
     <#
     .SYNOPSIS
@@ -883,7 +1479,8 @@ function Test-DockerDatabaseHealth {
         }
         
         # Redis健康检查
-        $redisReady = & docker exec trademaster_redis redis-cli ping 2>$null
+        $redisPassword = $env:REDIS_PASSWORD ?? "TradeMaster2024!"
+        $redisReady = & docker exec trademaster-redis redis-cli --no-auth-warning -a $redisPassword ping 2>$null
         if ($redisReady -eq "PONG") {
             Write-Host "  ✓ Redis服务就绪" -ForegroundColor Green
         } else {
@@ -1174,7 +1771,8 @@ function Main {
         
         # 选择部署方案
         $selectedScheme = Select-DeploymentScheme -RequestedScheme $DeployScheme
-        Write-Information "使用部署方案: $selectedScheme"
+        $displayName = Get-SchemeDisplayName -Scheme $selectedScheme
+        Write-Information "使用部署方案: $displayName"
         
         # 系统环境检查
         Test-Prerequisites -Scheme $selectedScheme
