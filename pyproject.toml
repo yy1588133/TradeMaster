@@ -12,7 +12,7 @@ name = "trademaster-web-interface"
 version = "1.0.0"
 description = "Modern web interface for TradeMaster quantitative trading platform"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.9"
 authors = [
     {name = "TradeMaster Team", email = "contact@trademaster.ai"},
@@ -33,7 +33,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
@@ -161,7 +160,7 @@ Changelog = "https://github.com/TradeMaster-NTU/TradeMaster/blob/main/CHANGELOG.
 
 # ==================== 构建配置 ====================
 [tool.setuptools]
-packages = ["web_interface.backend.app"]
+packages = ["trademaster"]
 package-dir = {"" = "."}
 
 [tool.setuptools.package-data]

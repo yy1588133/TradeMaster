@@ -102,11 +102,23 @@ except Exception as e:
     fi
 }
 
-# 测试数据库连接 - 临时跳过以避免asyncpg URL解析问题
+# 测试数据库连接 - 使用改进的连接测试脚本
 test_database_connection() {
     log_info "测试数据库连接..."
-    log_warning "临时跳过数据库连接测试，避免asyncpg URL格式问题"
-    log_success "数据库连接测试跳过"
+    
+    # 使用专用的数据库测试脚本
+    if python3 /app/db_test.py; then
+        log_success "数据库连接测试通过"
+    else
+        log_error "数据库连接测试失败"
+        # 在开发环境下可以容忍连接失败，但要记录警告
+        if [ "$DEBUG" = "true" ]; then
+            log_warning "开发模式下继续启动，但数据库功能可能不可用"
+        else
+            log_error "生产环境下数据库连接是必需的"
+            exit 1
+        fi
+    fi
 }
 
 # 测试Redis连接
@@ -151,18 +163,69 @@ except Exception as e:
     fi
 }
 
-# 运行数据库迁移 - 临时跳过以解决CORS配置问题
+# 运行数据库迁移 - 使用改进的配置处理
 run_migrations() {
     log_info "运行数据库迁移..."
-    log_warning "临时跳过数据库迁移，避免CORS配置解析问题"
-    log_success "数据库迁移跳过"
+    
+    # 检查是否需要迁移
+    if [ -f "/app/alembic.ini" ] && [ -d "/app/alembic" ]; then
+        # 在开发模式下跳过迁移以避免冲突
+        if [ "$DEBUG" = "true" ]; then
+            log_warning "开发模式下跳过数据库迁移"
+            log_success "数据库迁移跳过"
+            return 0
+        fi
+        
+        # 生产环境下执行迁移
+        if alembic upgrade head; then
+            log_success "数据库迁移完成"
+        else
+            log_error "数据库迁移失败"
+            exit 1
+        fi
+    else
+        log_info "未找到Alembic配置，跳过数据库迁移"
+        log_success "数据库迁移跳过"
+    fi
 }
 
-# 初始化数据库数据 - 临时跳过以解决CORS配置问题
+# 初始化数据库数据 - 使用改进的初始化逻辑
 init_database() {
     log_info "初始化数据库数据..."
-    log_warning "临时跳过数据库初始化，避免CORS配置解析问题"
-    log_success "数据库初始化跳过"
+    
+    # 检查是否需要初始化
+    if python3 -c "
+import asyncio
+import os
+import sys
+sys.path.append('/app')
+
+try:
+    from app.core.database import init_database
+    print('开始数据库初始化...')
+    asyncio.run(init_database())
+    print('✓ 数据库初始化成功')
+except ImportError as e:
+    print(f'数据库初始化模块不可用: {e}')
+    print('跳过数据库初始化')
+except Exception as e:
+    if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
+        print('数据库已初始化，跳过')
+    else:
+        print(f'数据库初始化失败: {e}')
+        if os.getenv('DEBUG', 'false').lower() != 'true':
+            sys.exit(1)
+"; then
+        log_success "数据库初始化完成"
+    else
+        if [ "$DEBUG" = "true" ]; then
+            log_warning "数据库初始化失败，但开发模式下继续启动"
+            log_success "数据库初始化跳过"
+        else
+            log_error "数据库初始化失败"
+            exit 1
+        fi
+    fi
 }
 
 # 验证应用配置 - 简化版本，跳过Pydantic验证
@@ -184,25 +247,34 @@ create_directories() {
             log_info "创建目录: $dir"
         fi
         
-        # 尝试设置权限，忽略失败（挂载卷可能无法修改权限）
-        if ! chmod 755 "$dir" 2>/dev/null; then
-            log_warning "无法设置目录权限: $dir (可能是挂载卷权限限制)"
+        # 检查目录是否可写
+        if [ -w "$dir" ]; then
+            # 如果目录可写，尝试设置权限
+            if chmod 755 "$dir" 2>/dev/null; then
+                log_info "设置目录权限成功: $dir"
+            else
+                log_warning "无法设置目录权限但目录可写: $dir"
+            fi
+        else
+            log_warning "目录不可写: $dir (可能是挂载卷限制，但将继续运行)"
         fi
     done
     
-    log_success "目录创建完成"
+    log_success "目录创建和权限设置完成"
 }
 
 # 清理临时文件
 cleanup_temp_files() {
     log_info "清理临时文件..."
     
-    # 清理Python缓存
-    find /app -name "*.pyc" -delete
-    find /app -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+    # 清理Python缓存 - 排除挂载的数据目录避免权限错误
+    find /app -path "/app/trademaster_data" -prune -o -path "/app/trademaster_configs" -prune -o -name "*.pyc" -print0 | xargs -0 rm -f 2>/dev/null || true
+    find /app -path "/app/trademaster_data" -prune -o -path "/app/trademaster_configs" -prune -o -name "__pycache__" -type d -print0 | xargs -0 rm -rf 2>/dev/null || true
     
     # 清理临时文件
-    find /app/temp -type f -mtime +1 -delete 2>/dev/null || true
+    if [ -d "/app/temp" ]; then
+        find /app/temp -type f -mtime +1 -delete 2>/dev/null || true
+    fi
     
     log_success "临时文件清理完成"
 }

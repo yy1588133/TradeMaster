@@ -49,6 +49,7 @@ venv.bak/
 docs/
 *.md
 *.rst
+!README.md
 # *.txt
 !requirements.txt
 !requirements-docker.txt
@@ -96,7 +97,7 @@ setup.cfg
 web_interface/frontend/node_modules/
 web_interface/frontend/.pnpm-store/
 web_interface/frontend/package-lock.json
-web_interface/frontend/pnpm-lock.yaml
+# web_interface/frontend/pnpm-lock.yaml  # 允许pnpm锁文件用于Docker构建
 web_interface/frontend/yarn.lock
 
 # Frontend build outputs
@@ -109,7 +110,7 @@ web_interface/frontend/.cache/
 web_interface/frontend/.env.development
 web_interface/frontend/.env.local
 web_interface/frontend/.eslintcache
-web_interface/frontend/.prettierrc
+# web_interface/frontend/.prettierrc  # 允许Docker构建时使用prettierrc
 web_interface/frontend/coverage/
 web_interface/frontend/reports/
 

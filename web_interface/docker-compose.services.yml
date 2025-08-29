@@ -7,7 +7,7 @@ services:
   # PostgreSQL 14 数据库服务
   postgresql:
     image: postgres:14-alpine
-    container_name: trademaster_postgresql
+    container_name: trademaster-postgresql
     hostname: postgresql
     restart: unless-stopped
     
@@ -62,7 +62,7 @@ services:
   # Redis 7 缓存服务
   redis:
     image: redis:7-alpine
-    container_name: trademaster_redis
+    container_name: trademaster-redis
     hostname: redis
     restart: unless-stopped
     
@@ -117,10 +117,39 @@ services:
 volumes:
   # PostgreSQL数据持久化 - 使用Docker管理的卷
   postgresql_data:
+    name: trademaster-postgresql-data
     driver: local
   
   # Redis数据持久化 - 使用Docker管理的卷
   redis_data:
+    name: trademaster-redis-data
+    driver: local
+  
+  # 后端数据卷 - 与主配置文件保持一致
+  backend_data:
+    name: trademaster-backend-data
+    driver: local
+    
+  backend_logs:
+    name: trademaster-backend-logs
+    driver: local
+    
+  backend_uploads:
+    name: trademaster-backend-uploads
+    driver: local
+    
+  backend_temp:
+    name: trademaster-backend-temp
+    driver: local
+  
+  # 前端数据卷
+  frontend_node_modules:
+    name: trademaster-frontend-node-modules
+    driver: local
+  
+  # Nginx日志卷
+  nginx_logs:
+    name: trademaster-nginx-logs
     driver: local
 
 # 网络定义

@@ -11,11 +11,9 @@
 /data_synthesis/TimeGAN/.ipynb_checkpoints/
 /data_synthesis/TimeGAN/metrics/.ipynb_checkpoints/
 /data_synthesis/timegan-pytorch/run.sh
+.bmad-core/
+**/__pycache__/
+web_interface/data/postgresql/pgdata/
 web_interface/docker/volumes/postgres_dev/base/
 web_interface/docker/volumes/postgres_dev/global
 web_interface/frontend/node_modules/
-.bmad-core/
-web_interface/backend/venv/
-**/__pycache__/
-web_interface/data/postgresql/pgdata/
-web_interface/data/postgresql/pgdata/

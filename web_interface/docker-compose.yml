@@ -105,12 +105,15 @@ services:
   # ==================== 后端API服务 ====================
   backend:
     build:
-      context: .
-      dockerfile: docker/backend/Dockerfile
+      context: ..  # 修改构建上下文到项目根目录以访问trademaster等文件
+      dockerfile: web_interface/docker/backend/Dockerfile
       target: production  # 强制使用production构建，避免development阶段网络问题
       args:
         BUILD_ENV: ${BUILD_ENV:-development}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple/}
+        BUILDKIT_INLINE_CACHE: 1  # 启用构建缓存
+      cache_from:
+        - web_interface-backend:latest
     
     container_name: trademaster-backend
     hostname: backend
@@ -175,7 +178,7 @@ services:
       - backend_uploads:/app/uploads
       - backend_temp:/app/temp
       
-      # TradeMaster数据共享
+      # TradeMaster数据共享 (使用绝对路径指向项目根目录)
       - ../data:/app/trademaster_data:ro
       - ../configs:/app/trademaster_configs:ro
     
@@ -213,13 +216,16 @@ services:
   # ==================== 前端Web服务 ====================
   frontend:
     build:
-      context: .
-      dockerfile: docker/frontend/Dockerfile
+      context: ..  # 修改构建上下文到项目根目录
+      dockerfile: web_interface/docker/frontend/Dockerfile
       target: ${BUILD_TARGET:-development}
       args:
         BUILD_ENV: ${BUILD_ENV:-development}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
         VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws}
+        BUILDKIT_INLINE_CACHE: 1  # 启用构建缓存
+      cache_from:
+        - web_interface-frontend:latest
     
     container_name: trademaster-frontend
     hostname: frontend
@@ -314,8 +320,8 @@ services:
       - "${NGINX_PORT:-8080}:80"
     
     volumes:
-      - ./docker/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./web_interface/docker/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web_interface/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_logs:/var/log/nginx
     
     depends_on:
@@ -423,48 +429,28 @@ networks:
 
 # ==================== 数据卷配置 ====================
 volumes:
-  # PostgreSQL数据持久化
+  # PostgreSQL数据持久化 - 使用Docker管理的卷（统一配置）
   postgresql_data:
     name: trademaster-postgresql-data
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/postgresql
 
-  # Redis数据持久化
+  # Redis数据持久化 - 使用Docker管理的卷（统一配置）
   redis_data:
     name: trademaster-redis-data
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/redis
 
-  # 后端数据卷
+  # 后端数据卷 - 使用Docker管理的卷（统一配置）
   backend_data:
     name: trademaster-backend-data
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/backend
 
   backend_logs:
     name: trademaster-backend-logs
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./logs/backend
 
   backend_uploads:
     name: trademaster-backend-uploads
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/uploads
 
   backend_temp:
     name: trademaster-backend-temp
@@ -475,14 +461,10 @@ volumes:
     name: trademaster-frontend-node-modules
     driver: local
 
-  # Nginx日志
+  # Nginx日志 - 使用Docker管理的卷（统一配置）
   nginx_logs:
     name: trademaster-nginx-logs
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./logs/nginx
 
   # pgAdmin数据
   pgadmin_data:

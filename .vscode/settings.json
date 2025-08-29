@@ -26,11 +26,17 @@
 
   "// ==================== 文件配置 ====================": "",
   "files.associations": {
-    "*.env.*": "dotenv",
+    ".env": "dotenv",
+    ".env.local": "dotenv",
+    ".env.development": "dotenv",
+    ".env.production": "dotenv",
+    ".env.test": "dotenv",
     "*.yml": "yaml",
     "*.yaml": "yaml",
-    "Dockerfile*": "dockerfile",
-    "docker-compose*.yml": "dockercompose"
+    "Dockerfile": "dockerfile",
+    "Dockerfile.*": "dockerfile",
+    "docker-compose.yml": "dockercompose",
+    "docker-compose.*.yml": "dockercompose"
   },
   "files.exclude": {
     "**/.git": true,
@@ -341,7 +347,7 @@
     "*.ts": "${capture}.js, ${capture}.d.ts.map, ${capture}.d.ts, ${capture}.js.map",
     "*.tsx": "${capture}.js, ${capture}.jsx",
     "package.json": "package-lock.json, pnpm-lock.yaml, yarn.lock",
-    "*.env": "*.env.*",
+    "*.env": ".env.local, .env.development, .env.production, .env.test",
     "docker-compose.yml": "docker-compose.*.yml",
     "Dockerfile": "Dockerfile.*",
     ".gitignore": ".gitattributes, .gitmodules, .gitmessage, .mailmap, .git-blame*",
