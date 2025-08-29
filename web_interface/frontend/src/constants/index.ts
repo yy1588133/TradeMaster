@@ -209,6 +209,7 @@ export const ROUTES = {
   TRAINING_CREATE: '/training/create',
   TRAINING_DETAIL: '/training/:id',
   ANALYSIS: '/analysis',
+  REALTIME_MONITOR: '/realtime/:sessionId/:strategyId',
   PROFILE: '/profile',
   SETTINGS: '/settings',
 } as const

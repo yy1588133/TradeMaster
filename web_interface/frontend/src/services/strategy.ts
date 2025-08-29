@@ -6,12 +6,17 @@ export const strategyService = {
   // Get strategy list
   getStrategies: async (params?: PaginationParams & {
     type?: string
-    status?: string
+    strategy_status?: string
     search?: string
   }): Promise<PaginationResponse<Strategy>> => {
+    // 过滤空字符串参数
+    const cleanParams = params ? Object.fromEntries(
+      Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+    ) : {}
+    
     const response = await apiClient.get<PaginationResponse<Strategy>>(
       API_ENDPOINTS.STRATEGIES.LIST,
-      { params }
+      { params: cleanParams }
     )
     return response.data
   },

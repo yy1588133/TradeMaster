@@ -8,7 +8,7 @@ export const getStrategiesAsync = createAsyncThunk(
   'strategy/getStrategies',
   async (params?: PaginationParams & {
     type?: string
-    status?: string
+    strategy_status?: string
     search?: string
   }, { rejectWithValue }) => {
     try {
@@ -24,7 +24,7 @@ export const fetchStrategiesAsync = createAsyncThunk(
   'strategy/fetchStrategies',
   async (params?: PaginationParams & {
     type?: string
-    status?: string
+    strategy_status?: string
     search?: string
   }, { rejectWithValue }) => {
     try {

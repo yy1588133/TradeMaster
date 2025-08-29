@@ -23,7 +23,7 @@ flower==2.0.1
 
 # ==================== 安全认证 ====================
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+passlib[bcrypt]==1.7.4.post1
 cryptography==41.0.7
 
 # ==================== 数据验证和序列化 ====================

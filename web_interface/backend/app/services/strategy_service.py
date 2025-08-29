@@ -24,9 +24,8 @@ from app.core.trademaster_config import (
     DatasetType
 )
 from app.services.trademaster_integration import (
-    get_trademaster_service,
-    TradeMasterAPIException,
-    IntegrationMode
+    get_integration_service,
+    TradeMasterAPIException
 )
 from app.models.database import (
     Strategy,
@@ -73,7 +72,7 @@ class StrategyService:
     def __init__(self):
         """初始化策略服务"""
         self.config_adapter = get_config_adapter()
-        self.trademaster_service = get_trademaster_service()
+        self.trademaster_service = get_integration_service()
         
         # 策略类型到TradeMaster任务类型的映射
         self.strategy_type_mapping = {

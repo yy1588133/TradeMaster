@@ -23,7 +23,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.trademaster_config import get_config_adapter
 from app.services.trademaster_integration import (
-    get_trademaster_service,
+    get_integration_service,
     TradeMasterAPIException
 )
 from app.models.database import (
@@ -81,7 +81,7 @@ class DataService:
     def __init__(self):
         """初始化数据服务"""
         self.config_adapter = get_trademaster_config_adapter()
-        self.trademaster_service = get_trademaster_service()
+        self.trademaster_service = get_integration_service()
         
         # 数据存储路径
         self.data_root = Path(settings.DATA_DIR if hasattr(settings, 'DATA_DIR') else 'data')

@@ -17,11 +17,26 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings, validate_settings
 from app.core.database import init_database, check_database_connection, get_database_info
 from app.core.security_middleware import SecurityMiddleware
 from app.api.api_v1.api import api_router
+
+# 导入完善的异常处理系统
+from app.api.exception_handlers import (
+    APIException,
+    TradeMasterConfigError,
+    api_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    pydantic_validation_exception_handler,
+    database_exception_handler,
+    trademaster_config_exception_handler,
+    general_exception_handler
+)
 
 
 # 配置日志
@@ -269,48 +284,18 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-# ==================== 异常处理器 ====================
+# ==================== 异常处理器配置 ====================
 
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """HTTP异常处理器"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "detail": exc.detail,
-            "status_code": exc.status_code,
-            "timestamp": time.time()
-        }
-    )
+# 注册自定义异常处理器
+app.add_exception_handler(APIException, api_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)  
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(PydanticValidationError, pydantic_validation_exception_handler)
+app.add_exception_handler(SQLAlchemyError, database_exception_handler)
+app.add_exception_handler(TradeMasterConfigError, trademaster_config_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """验证异常处理器"""
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "detail": "请求数据验证失败",
-            "errors": exc.errors(),
-            "status_code": 422,
-            "timestamp": time.time()
-        }
-    )
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    """通用异常处理器"""
-    logger.error(f"未处理的异常: {str(exc)}", exc_info=True)
-    
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "detail": "服务器内部错误" if settings.is_production else str(exc),
-            "status_code": 500,
-            "timestamp": time.time()
-        }
-    )
+logger.info("✅ 异常处理器已注册")
 
 
 # ==================== 路由配置 ====================

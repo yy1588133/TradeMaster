@@ -15,7 +15,9 @@ from app.api.api_v1.endpoints import (
     data,
     training,
     analysis,
-    tools
+    tools,
+    websocket,
+    settings
 )
 
 
@@ -70,6 +72,18 @@ api_router.include_router(
     tags=["工具集成"]
 )
 
+api_router.include_router(
+    websocket.router,
+    prefix="/ws",
+    tags=["WebSocket通信"]
+)
+
+api_router.include_router(
+    settings.router,
+    prefix="/settings",
+    tags=["设置管理"]
+)
+
 
 # API状态检查端点
 @api_router.get("/status", tags=["系统"])
@@ -87,6 +101,8 @@ async def api_status():
             "data": "数据管理接口",
             "training": "训练任务接口",
             "analysis": "分析评估接口",
-            "tools": "工具集成接口"
+            "tools": "工具集成接口",
+            "ws": "WebSocket实时通信接口",
+            "settings": "设置管理接口"
         }
     }

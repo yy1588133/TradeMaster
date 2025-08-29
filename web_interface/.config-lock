@@ -1,0 +1,25 @@
+# TradeMaster 配置锁定文件
+# 此文件用于防止配置被意外重置
+
+## 当前稳定配置 (请勿修改)
+BACKEND_PORT=8000
+API_BASE_URL=http://localhost:8000/api/v1
+WS_URL=ws://localhost:8000/ws
+
+## 修复记录
+- 2025-08-28: 修复前端配置重置问题
+- 后端服务稳定运行在8000端口
+- 所有认证功能正常工作
+- PyTorch/mmengine警告为可选依赖，不影响Web功能
+
+## 成功验证功能
+✅ 用户注册API: POST /api/v1/auth/register
+✅ 健康检查API: GET /health  
+✅ 数据库连接: PostgreSQL正常
+✅ 前后端通信: 端口8000正常工作
+
+## 注意事项
+如果quick-start.ps1重新生成配置文件，请确保：
+1. 后端端口保持8000
+2. 前端.env.local文件中API地址指向8000端口
+3. 可以参考此文件恢复正确配置

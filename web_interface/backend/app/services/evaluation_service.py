@@ -21,7 +21,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.services.trademaster_integration import (
-    get_trademaster_service,
+    get_integration_service,
     TradeMasterAPIException
 )
 from app.models.database import (
@@ -71,7 +71,7 @@ class EvaluationService:
     
     def __init__(self):
         """初始化评估服务"""
-        self.trademaster_service = get_trademaster_service()
+        self.trademaster_service = get_integration_service()
         
         # 报告存储路径
         self.reports_dir = Path(settings.DATA_DIR if hasattr(settings, 'DATA_DIR') else 'data') / 'reports'

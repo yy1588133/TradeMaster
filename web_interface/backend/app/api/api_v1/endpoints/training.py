@@ -22,6 +22,18 @@ from app.services.training_service import get_training_service, TrainingServiceE
 from app.core.config import settings
 from loguru import logger
 
+# 导入新的异常处理系统
+from app.api.exception_handlers import (
+    APIException,
+    BusinessLogicException,
+    ValidationException,
+    ResourceNotFoundException,
+    ExternalServiceException,
+    ensure_resource_exists,
+    validate_and_raise,
+    handle_external_service_error
+)
+
 router = APIRouter()
 
 # ==================== 请求/响应模型 ====================
@@ -78,10 +90,29 @@ async def create_training_job(
     
     创建单个策略训练任务，支持自定义训练配置和资源分配
     """
+    # 验证输入参数
+    validate_and_raise(
+        request.strategy_id.strip() != "",
+        "策略ID不能为空",
+        {"field": "strategy_id"}
+    )
+    
+    validate_and_raise(
+        request.dataset_id.strip() != "",
+        "数据集ID不能为空", 
+        {"field": "dataset_id"}
+    )
+    
+    validate_and_raise(
+        request.job_name.strip() != "",
+        "任务名称不能为空",
+        {"field": "job_name"}
+    )
+    
     try:
         training_service = get_training_service()
         
-        # 创建训练任务
+        # 创建训练任务 - 使用改进的错误处理
         result = await training_service.create_training_job(
             strategy_id=request.strategy_id,
             dataset_id=request.dataset_id,
@@ -100,11 +131,15 @@ async def create_training_job(
         return result
         
     except TrainingServiceError as e:
-        logger.error(f"创建训练任务失败: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"创建训练任务异常: {str(e)}")
-        raise HTTPException(status_code=500, detail="创建训练任务失败")
+        # 将训练服务错误转换为业务逻辑异常
+        raise BusinessLogicException(
+            message=f"创建训练任务失败: {str(e)}",
+            details={
+                "strategy_id": request.strategy_id,
+                "dataset_id": request.dataset_id,
+                "job_name": request.job_name
+            }
+        )
 
 
 @router.post("/jobs/batch", response_model=Dict[str, Any])
@@ -202,6 +237,12 @@ async def get_training_job(
     
     包括任务配置、执行状态、训练指标等信息
     """
+    # 验证参数
+    validate_and_raise(
+        job_id.strip() != "",
+        "任务ID不能为空"
+    )
+    
     try:
         training_service = get_training_service()
         
@@ -212,14 +253,20 @@ async def get_training_job(
             include_metrics=include_metrics
         )
         
-        return result
+        # 确保任务存在并返回结果
+        return ensure_resource_exists(result, "训练任务", job_id)
         
     except TrainingServiceError as e:
-        logger.error(f"获取训练任务详情失败: {job_id}, {str(e)}")
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error(f"获取训练任务详情异常: {job_id}, {str(e)}")
-        raise HTTPException(status_code=500, detail="获取训练任务详情失败")
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "不存在" in error_msg:
+            # 转换为资源未找到异常
+            raise ResourceNotFoundException("训练任务", job_id)
+        else:
+            # 其他业务逻辑异常
+            raise BusinessLogicException(
+                message=f"获取训练任务详情失败: {str(e)}",
+                details={"job_id": job_id}
+            )
 
 
 # ==================== 训练任务控制API ====================

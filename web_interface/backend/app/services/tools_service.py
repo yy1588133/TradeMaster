@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.services.trademaster_integration import (
-    get_trademaster_service,
+    get_integration_service,
     TradeMasterAPIException
 )
 
@@ -75,7 +75,7 @@ class ToolsService:
     
     def __init__(self):
         """初始化工具服务"""
-        self.trademaster_service = get_trademaster_service()
+        self.trademaster_service = get_integration_service()
         
         # TradeMaster根路径
         self.trademaster_root = Path(__file__).resolve().parents[4]

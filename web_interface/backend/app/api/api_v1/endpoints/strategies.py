@@ -8,6 +8,7 @@
 import time
 from typing import Any, Dict, List, Optional
 from enum import Enum
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from pydantic import BaseModel, Field
@@ -27,8 +28,9 @@ from app.core.dependencies import (
     SearchDeps
 )
 from app.core.security import Permission
+from app.services.trademaster_integration import get_integration_service
+from app.services.websocket_service import get_websocket_manager
 from app.services.strategy_service import get_strategy_service, StrategyServiceError
-from app.services.trademaster_integration import TradeMasterService
 from app.crud.strategy import strategy_crud, strategy_version_crud
 from app.schemas.strategy import (
     StrategyCreate, StrategyUpdate, StrategyResponse, StrategyDetail,
@@ -101,7 +103,7 @@ async def list_strategies(
     current_user: CurrentUser,
     db: DatabaseSession,
     strategy_type: Optional[StrategyType] = Query(None, description="按策略类型过滤"),
-    status: Optional[StrategyStatus] = Query(None, description="按状态过滤"),
+    strategy_status: Optional[str] = Query(None, description="按策略状态过滤"),
     tags: Optional[str] = Query(None, description="按标签过滤（逗号分隔）"),
     category: Optional[str] = Query(None, description="按分类过滤")
 ) -> StrategyListResponse:
@@ -110,6 +112,21 @@ async def list_strategies(
     支持分页、排序、搜索和多种过滤条件。
     """
     try:
+        # 处理空字符串参数，转换为None
+        if strategy_status == "":
+            strategy_status = None
+        
+        # 验证状态参数
+        status_enum = None
+        if strategy_status:
+            try:
+                status_enum = StrategyStatus(strategy_status)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"无效的状态值: {strategy_status}。有效值: {[s.value for s in StrategyStatus]}"
+                )
+        
         # 解析标签
         tag_list = None
         if tags:
@@ -122,11 +139,11 @@ async def list_strategies(
             limit=pagination.limit,
             owner_id=current_user["id"],
             strategy_type=strategy_type,
-            status=status,
+            status=status_enum,
             category=category,
             tags=tag_list,
             search=search.query,
-            sort_by=sort.field,
+            sort_by=sort.sort_by,
             sort_order=sort.order,
             load_relations=False
         )
@@ -136,7 +153,7 @@ async def list_strategies(
             db,
             owner_id=current_user["id"],
             strategy_type=strategy_type,
-            status=status,
+            status=status_enum,
             category=category,
             tags=tag_list,
             search=search.query
@@ -321,64 +338,53 @@ async def delete_strategy(
 
 
 @router.post(
-    "/{strategy_id}/execute",
-    response_model=StrategyExecutionResponse,
-    summary="执行策略",
+    "/{strategy_id}/train",
+    summary="启动策略训练",
     dependencies=[Depends(require_permission(Permission.EXECUTE_STRATEGY))]
 )
-async def execute_strategy(
+async def start_strategy_training(
     strategy_id: int,
-    execute_data: StrategyExecuteRequest,
     current_user: CurrentUser,
-    db: DatabaseSession
-) -> StrategyExecutionResponse:
-    """执行策略
+    db: DatabaseSession,
+    training_config: Dict[str, Any] = Body(...)
+) -> Dict[str, Any]:
+    """启动策略训练任务
     
-    启动策略的回测或实盘运行。
+    创建训练会话并启动异步训练任务。
     """
     try:
-        from app.services.strategy_service import StrategyRunMode
+        integration_service = get_integration_service()
         
-        strategy_service = get_strategy_service()
-        
-        # 映射运行模式
-        run_mode_mapping = {
-            "backtest": StrategyRunMode.BACKTEST,
-            "paper_trading": StrategyRunMode.PAPER_TRADING,
-            "live_trading": StrategyRunMode.LIVE_TRADING
-        }
-        
-        run_mode = run_mode_mapping.get(execute_data.mode, StrategyRunMode.BACKTEST)
-        
-        # 构建运行配置
-        run_config = {
-            "start_date": execute_data.start_date,
-            "end_date": execute_data.end_date,
-            "initial_capital": execute_data.initial_capital or 100000,
-            "risk_params": execute_data.risk_params
-        }
-        
-        # 启动策略
-        result = await strategy_service.start_strategy(
-            db=db,
+        # 创建训练会话
+        session_id = await integration_service.create_training_session(
             strategy_id=strategy_id,
             user_id=current_user["id"],
-            run_mode=run_mode,
-            run_config=run_config
+            config=training_config
         )
         
-        execution_id = f"exec_{strategy_id}_{int(time.time())}"
+        # 启动训练任务
+        task_id = await integration_service.start_training_task(session_id)
         
-        return StrategyExecutionResponse(
-            execution_id=execution_id,
-            strategy_id=str(strategy_id),
-            status=result["status"],
-            session_id=result.get("session_id"),
-            message=result["message"],
-            started_at=result["started_at"]
-        )
+        # 发送WebSocket通知
+        ws_manager = get_websocket_manager()
+        await ws_manager.broadcast_to_user(current_user["id"], {
+            "type": "training_started",
+            "session_id": session_id,
+            "strategy_id": strategy_id,
+            "task_id": task_id,
+            "message": "策略训练已启动"
+        })
         
-    except StrategyServiceError as e:
+        return {
+            "session_id": session_id,
+            "task_id": task_id,
+            "strategy_id": strategy_id,
+            "status": "started",
+            "message": "策略训练已启动",
+            "created_at": datetime.now().isoformat()
+        }
+        
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -386,37 +392,147 @@ async def execute_strategy(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"策略执行失败: {str(e)}"
+            detail=f"启动训练失败: {str(e)}"
+        )
+
+
+@router.post(
+    "/{strategy_id}/backtest",
+    summary="启动策略回测",
+    dependencies=[Depends(require_permission(Permission.EXECUTE_STRATEGY))]
+)
+async def start_strategy_backtest(
+    strategy_id: int,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+    backtest_config: Dict[str, Any] = Body(...)
+) -> Dict[str, Any]:
+    """启动策略回测任务
+    
+    创建回测会话并启动异步回测任务。
+    """
+    try:
+        integration_service = get_integration_service()
+        
+        # 创建回测会话
+        session_id = await integration_service.create_backtest_session(
+            strategy_id=strategy_id,
+            user_id=current_user["id"],
+            config=backtest_config
+        )
+        
+        # 启动回测任务
+        task_id = await integration_service.start_backtest_task(session_id)
+        
+        # 发送WebSocket通知
+        ws_manager = get_websocket_manager()
+        await ws_manager.broadcast_to_user(current_user["id"], {
+            "type": "backtest_started",
+            "session_id": session_id,
+            "strategy_id": strategy_id,
+            "task_id": task_id,
+            "message": "策略回测已启动"
+        })
+        
+        return {
+            "session_id": session_id,
+            "task_id": task_id,
+            "strategy_id": strategy_id,
+            "status": "started",
+            "message": "策略回测已启动",
+            "created_at": datetime.now().isoformat()
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"启动回测失败: {str(e)}"
+        )
+
+
+@router.get("/{strategy_id}/sessions", summary="获取策略会话列表")
+async def get_strategy_sessions(
+    strategy_id: int,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+    limit: int = Query(20, description="返回数量限制")
+) -> Dict[str, Any]:
+    """获取策略的训练和回测会话列表"""
+    try:
+        integration_service = get_integration_service()
+        
+        # 获取用户的所有会话
+        all_sessions = await integration_service.get_user_sessions(
+            user_id=current_user["id"],
+            limit=limit * 2  # 获取更多数据以便过滤
+        )
+        
+        # 过滤出指定策略的会话
+        strategy_sessions = [
+            session for session in all_sessions
+            if session["strategy_id"] == strategy_id
+        ][:limit]
+        
+        return {
+            "strategy_id": strategy_id,
+            "sessions": strategy_sessions,
+            "total": len(strategy_sessions),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取会话列表失败: {str(e)}"
         )
 
 
 @router.post(
     "/{strategy_id}/stop",
-    summary="停止策略",
+    summary="停止策略会话",
     dependencies=[Depends(require_permission(Permission.EXECUTE_STRATEGY))]
 )
-async def stop_strategy(
+async def stop_strategy_session(
     strategy_id: int,
     current_user: CurrentUser,
-    db: DatabaseSession
+    db: DatabaseSession,
+    session_id: int = Body(..., embed=True)
 ) -> Dict[str, Any]:
-    """停止策略执行
+    """停止策略训练或回测会话
     
-    停止正在运行的策略。
+    停止正在运行的策略会话。
     """
     try:
-        strategy_service = get_strategy_service()
+        integration_service = get_integration_service()
         
-        # 停止策略
-        result = await strategy_service.stop_strategy(
-            db=db,
-            strategy_id=strategy_id,
+        # 停止会话
+        result = await integration_service.stop_session(
+            session_id=session_id,
             user_id=current_user["id"]
         )
         
-        return result
+        # 发送WebSocket通知
+        ws_manager = get_websocket_manager()
+        await ws_manager.broadcast_to_user(current_user["id"], {
+            "type": "session_stopped",
+            "session_id": session_id,
+            "strategy_id": strategy_id,
+            "message": "会话已停止"
+        })
         
-    except StrategyServiceError as e:
+        return {
+            **result,
+            "strategy_id": strategy_id,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -424,7 +540,7 @@ async def stop_strategy(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"停止策略失败: {str(e)}"
+            detail=f"停止会话失败: {str(e)}"
         )
 
 
@@ -566,104 +682,25 @@ async def clone_strategy(
 
 # ==================== 新增API端点 ====================
 
-@router.get("/templates", response_model=List[StrategyTemplateResponse], summary="获取策略模板列表")
+@router.get("/templates", summary="获取策略模板列表")
 async def get_strategy_templates(
     current_user: CurrentUser,
     strategy_type: Optional[StrategyType] = Query(None, description="按策略类型过滤")
-) -> List[StrategyTemplateResponse]:
+) -> List[Dict[str, Any]]:
     """获取策略模板列表
     
     返回可用的策略模板，用户可以基于模板创建新策略。
     """
     try:
-        # 定义模板数据
-        templates = []
+        integration_service = get_integration_service()
+        templates = await integration_service.get_available_strategies()
         
-        # 算法交易模板
-        if not strategy_type or strategy_type == StrategyType.ALGORITHMIC_TRADING:
-            templates.extend([
-                StrategyTemplateResponse(
-                    name="DQN算法交易策略",
-                    description="基于深度Q网络的算法交易策略，适用于单资产交易",
-                    strategy_type=StrategyType.ALGORITHMIC_TRADING,
-                    config_template={
-                        "task_name": "algorithmic_trading",
-                        "dataset_name": "BTC",
-                        "agent_name": "dqn",
-                        "trainer_name": "algorithmic_trading",
-                        "net_name": "dqn",
-                        "optimizer_name": "adam"
-                    },
-                    parameters_template={
-                        "learning_rate": 0.001,
-                        "batch_size": 32,
-                        "memory_size": 10000,
-                        "epsilon_start": 1.0,
-                        "epsilon_end": 0.01,
-                        "epsilon_decay": 0.995
-                    },
-                    example_values={
-                        "symbol": "BTC-USDT",
-                        "timeframe": "1h",
-                        "lookback_window": 30
-                    }
-                ),
-                StrategyTemplateResponse(
-                    name="PPO算法交易策略",
-                    description="基于近端策略优化的算法交易策略，适用于连续动作空间",
-                    strategy_type=StrategyType.ALGORITHMIC_TRADING,
-                    config_template={
-                        "task_name": "algorithmic_trading",
-                        "dataset_name": "BTC",
-                        "agent_name": "ppo",
-                        "trainer_name": "algorithmic_trading",
-                        "net_name": "ppo",
-                        "optimizer_name": "adam"
-                    },
-                    parameters_template={
-                        "learning_rate": 0.0003,
-                        "batch_size": 64,
-                        "n_steps": 2048,
-                        "clip_range": 0.2,
-                        "entropy_coef": 0.01
-                    },
-                    example_values={
-                        "symbol": "ETH-USDT",
-                        "timeframe": "15m",
-                        "max_position": 1.0
-                    }
-                )
-            ])
-        
-        # 投资组合管理模板
-        if not strategy_type or strategy_type == StrategyType.PORTFOLIO_MANAGEMENT:
-            templates.append(
-                StrategyTemplateResponse(
-                    name="EIIE投资组合策略",
-                    description="基于集成投资组合优化的多资产配置策略",
-                    strategy_type=StrategyType.PORTFOLIO_MANAGEMENT,
-                    config_template={
-                        "task_name": "portfolio_management",
-                        "dataset_name": "dj30",
-                        "agent_name": "eiie",
-                        "trainer_name": "portfolio_management",
-                        "net_name": "eiie",
-                        "optimizer_name": "adam"
-                    },
-                    parameters_template={
-                        "learning_rate": 0.001,
-                        "batch_size": 128,
-                        "window_size": 50,
-                        "portfolio_size": 10,
-                        "transaction_cost": 0.0025
-                    },
-                    example_values={
-                        "assets": ["AAPL", "MSFT", "GOOGL", "AMZN"],
-                        "rebalance_frequency": "daily",
-                        "risk_tolerance": "medium"
-                    }
-                )
-            )
+        # 按策略类型过滤
+        if strategy_type:
+            templates = [
+                template for template in templates
+                if template["strategy_type"] == strategy_type.value
+            ]
         
         return templates
         
@@ -674,38 +711,31 @@ async def get_strategy_templates(
         )
 
 
-@router.post("/{strategy_id}/validate", response_model=StrategyConfigValidationResponse, summary="验证策略配置")
+@router.post("/{strategy_id}/validate", summary="验证策略配置")
 async def validate_strategy_config(
     strategy_id: int,
-    validation_request: StrategyConfigValidation,
     current_user: CurrentUser,
-    db: DatabaseSession
-) -> StrategyConfigValidationResponse:
+    db: DatabaseSession,
+    config: Dict[str, Any] = Body(...)
+) -> Dict[str, Any]:
     """验证策略配置
     
     检查策略配置的有效性，返回验证结果和建议。
     """
     try:
-        # 验证策略所有权
-        strategy = await strategy_crud.get(db, strategy_id=strategy_id)
-        if not strategy or strategy.owner_id != current_user["id"]:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="策略不存在"
-            )
+        integration_service = get_integration_service()
         
-        strategy_service = get_strategy_service()
+        # 获取策略类型（这里简化处理）
+        strategy_type = config.get("strategy_type", "algorithmic_trading")
         
         # 验证配置
-        validation_result = await strategy_service.validate_strategy_config(
-            config=validation_request.config,
-            strategy_type=validation_request.strategy_type
+        validation_result = await integration_service.validate_strategy_config(
+            config=config,
+            strategy_type=strategy_type
         )
         
         return validation_result
         
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

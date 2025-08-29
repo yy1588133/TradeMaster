@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { App as AntdApp } from 'antd'
 
 import { useAppDispatch, useAppSelector } from './store'
@@ -21,7 +21,9 @@ import StrategyDetail from './pages/Strategy/StrategyDetail'
 import DatasetList from './pages/Data/DatasetList'
 import TrainingList from './pages/Training/TrainingList'
 import Analysis from './pages/Analysis/Analysis'
+import RealTimeMonitor from './components/RealTime/RealTimeMonitor'
 import Profile from './pages/Profile/Profile'
+import Settings from './pages/Settings/Settings'
 import NotFound from './pages/Common/NotFound'
 
 // Protected route wrapper
@@ -33,6 +35,18 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
   
   return <>{children}</>
+}
+
+// Real-time monitor wrapper to handle route parameters
+const RealTimeMonitorWrapper: React.FC = () => {
+  const { sessionId, strategyId } = useParams<{ sessionId: string; strategyId: string }>()
+  
+  return (
+    <RealTimeMonitor
+      sessionId={parseInt(sessionId || '0')}
+      strategyId={parseInt(strategyId || '0')}
+    />
+  )
 }
 
 // Public route wrapper (redirect to dashboard if authenticated)
@@ -139,9 +153,15 @@ const App: React.FC = () => {
 
           {/* Analysis routes */}
           <Route path={ROUTES.ANALYSIS.slice(1)} element={<Analysis />} />
+          
+          {/* Real-time monitoring routes */}
+          <Route path={ROUTES.REALTIME_MONITOR.slice(1)} element={<RealTimeMonitorWrapper />} />
 
           {/* Profile routes */}
           <Route path={ROUTES.PROFILE.slice(1)} element={<Profile />} />
+          
+          {/* Settings routes */}
+          <Route path={ROUTES.SETTINGS.slice(1)} element={<Settings />} />
         </Route>
 
         {/* 404 route */}

@@ -19,7 +19,7 @@ const MainLayout: React.FC = () => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sidebar />
-      <Layout>
+      <Layout style={{ marginLeft: sidebarCollapsed ? 80 : 256, transition: 'margin-left 0.3s' }}>
         <Header />
         <Content
           style={{
@@ -28,7 +28,7 @@ const MainLayout: React.FC = () => {
             minHeight: 'calc(100vh - 64px)',
             background: colorBgContainer,
             borderRadius: 8,
-            overflow: 'initial',
+            overflow: 'auto',
           }}
         >
           <div style={{ padding: '0 24px' }}>

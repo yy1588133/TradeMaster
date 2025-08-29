@@ -19,9 +19,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.trademaster_config import get_config_adapter
 from app.services.trademaster_integration import (
-    get_trademaster_service,
-    TradeMasterAPIException,
-    IntegrationMode
+    get_integration_service,
+    TradeMasterAPIException
 )
 from app.models.database import (
     TrainingJob,
@@ -68,7 +67,7 @@ class TrainingService:
     def __init__(self):
         """初始化训练服务"""
         self.config_adapter = get_trademaster_config_adapter()
-        self.trademaster_service = get_trademaster_service()
+        self.trademaster_service = get_integration_service()
         
         # 训练任务状态映射
         self.status_mapping = {

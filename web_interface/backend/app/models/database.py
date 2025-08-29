@@ -152,6 +152,22 @@ class TaskStatus(str, enum.Enum):
     REVOKED = "REVOKED"
 
 
+class SessionType(str, enum.Enum):
+    """会话类型枚举"""
+    TRAINING = "training"
+    BACKTEST = "backtest"
+    LIVE_TRADING = "live_trading"
+
+
+class SessionStatus(str, enum.Enum):
+    """会话状态枚举"""
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 # ==================== Mixin类 ====================
 
 class TimestampMixin:
@@ -264,6 +280,12 @@ class User(Base, TimestampMixin, UUIDMixin):
     )
     api_keys: Mapped[List["APIKey"]] = relationship(
         "APIKey", back_populates="user", cascade="all, delete-orphan"
+    )
+    strategy_sessions: Mapped[List["StrategySession"]] = relationship(
+        "StrategySession", back_populates="user", cascade="all, delete-orphan"
+    )
+    websocket_connections: Mapped[List["WebSocketConnection"]] = relationship(
+        "WebSocketConnection", back_populates="user", cascade="all, delete-orphan"
     )
     
     def __repr__(self) -> str:
@@ -431,6 +453,9 @@ class Strategy(Base, TimestampMixin, UUIDMixin):
     )
     evaluations: Mapped[List["Evaluation"]] = relationship(
         "Evaluation", back_populates="strategy", cascade="all, delete-orphan"
+    )
+    sessions: Mapped[List["StrategySession"]] = relationship(
+        "StrategySession", back_populates="strategy", cascade="all, delete-orphan"
     )
     
     def __repr__(self) -> str:
@@ -905,6 +930,284 @@ class SystemLog(Base):
         return f"<SystemLog(id={self.id}, level='{self.level}', message='{self.message[:50]}...')>"
 
 
+class StrategySession(Base, TimestampMixin, UUIDMixin):
+    """策略执行会话模型
+    
+    管理策略训练、回测、实盘交易的完整生命周期。
+    与TradeMaster核心和Celery任务系统集成。
+    """
+    __tablename__ = "strategy_sessions"
+    __table_args__ = (
+        Index("idx_strategy_sessions_strategy", "strategy_id"),
+        Index("idx_strategy_sessions_status", "status"),
+        Index("idx_strategy_sessions_type_status", "session_type", "status"),
+        Index("idx_strategy_sessions_user", "user_id"),
+        Index("idx_strategy_sessions_celery_task", "celery_task_id"),
+        CheckConstraint("progress >= 0 AND progress <= 100", name="valid_session_progress"),
+        {"comment": "策略执行会话表"}
+    )
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="会话ID")
+    
+    # 基本信息
+    session_type: Mapped[SessionType] = mapped_column(
+        nullable=False, comment="会话类型"
+    )
+    status: Mapped[SessionStatus] = mapped_column(
+        default=SessionStatus.PENDING, nullable=False, comment="会话状态"
+    )
+    
+    # 关联信息
+    strategy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("strategies.id", ondelete="CASCADE"), 
+        nullable=False, comment="策略ID"
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, comment="用户ID"
+    )
+    
+    # TradeMaster集成
+    trademaster_config: Mapped[Dict[str, Any]] = mapped_column(
+        CompatibleJSON, nullable=False, comment="TradeMaster配置"
+    )
+    trademaster_session_id: Mapped[Optional[str]] = mapped_column(
+        String(100), comment="TradeMaster会话ID"
+    )
+    celery_task_id: Mapped[Optional[str]] = mapped_column(
+        String(155), comment="Celery任务ID"
+    )
+    
+    # 执行进度
+    progress: Mapped[float] = mapped_column(
+        Numeric(5, 2), default=0.0, nullable=False, comment="进度百分比"
+    )
+    current_epoch: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, comment="当前轮次"
+    )
+    total_epochs: Mapped[Optional[int]] = mapped_column(
+        Integer, comment="总轮次"
+    )
+    
+    # 结果数据
+    final_metrics: Mapped[Dict[str, Any]] = mapped_column(
+        CompatibleJSON, default=dict, nullable=False, comment="最终指标"
+    )
+    model_path: Mapped[Optional[str]] = mapped_column(
+        String(500), comment="模型文件路径"
+    )
+    log_file_path: Mapped[Optional[str]] = mapped_column(
+        String(500), comment="日志文件路径"
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text, comment="错误信息"
+    )
+    
+    # 时间戳
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), comment="开始时间"
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), comment="完成时间"
+    )
+    
+    # 关系映射
+    strategy: Mapped["Strategy"] = relationship(
+        "Strategy", back_populates="sessions"
+    )
+    user: Mapped["User"] = relationship(
+        "User", back_populates="strategy_sessions"
+    )
+    metrics: Mapped[List["PerformanceMetric"]] = relationship(
+        "PerformanceMetric", back_populates="session", cascade="all, delete-orphan"
+    )
+    resource_usage: Mapped[List["ResourceUsage"]] = relationship(
+        "ResourceUsage", back_populates="session", cascade="all, delete-orphan"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<StrategySession(id={self.id}, type='{self.session_type}', status='{self.status}')>"
+
+
+class PerformanceMetric(Base):
+    """实时性能指标模型
+    
+    记录策略执行过程中的性能指标数据。
+    支持实时监控和历史分析。
+    """
+    __tablename__ = "performance_metrics"
+    __table_args__ = (
+        Index("idx_performance_metrics_session", "session_id"),
+        Index("idx_performance_metrics_epoch", "session_id", "epoch"),
+        Index("idx_performance_metrics_name_time", "metric_name", "recorded_at"),
+        {"comment": "性能指标表"}
+    )
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="指标ID")
+    
+    # 关联会话
+    session_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("strategy_sessions.id", ondelete="CASCADE"), 
+        nullable=False, comment="会话ID"
+    )
+    
+    # 指标信息
+    metric_name: Mapped[str] = mapped_column(
+        String(50), nullable=False, comment="指标名称"
+    )
+    metric_value: Mapped[float] = mapped_column(
+        Numeric(15, 8), nullable=False, comment="指标值"
+    )
+    epoch: Mapped[Optional[int]] = mapped_column(
+        Integer, comment="轮次"
+    )
+    step: Mapped[Optional[int]] = mapped_column(
+        Integer, comment="步数"
+    )
+    
+    # 元数据
+    metric_metadata: Mapped[Dict[str, Any]] = mapped_column(
+        CompatibleJSON, default=dict, nullable=False, comment="元数据"
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        nullable=False,
+        comment="记录时间"
+    )
+    
+    # 关系映射
+    session: Mapped["StrategySession"] = relationship(
+        "StrategySession", back_populates="metrics"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<PerformanceMetric(id={self.id}, name='{self.metric_name}', value={self.metric_value})>"
+
+
+class ResourceUsage(Base):
+    """系统资源使用记录模型
+    
+    记录会话执行过程中的系统资源使用情况。
+    用于性能监控和资源优化。
+    """
+    __tablename__ = "resource_usage"
+    __table_args__ = (
+        Index("idx_resource_usage_session", "session_id"),
+        Index("idx_resource_usage_time", "session_id", "recorded_at"),
+        {"comment": "资源使用记录表"}
+    )
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="记录ID")
+    
+    # 关联会话
+    session_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("strategy_sessions.id", ondelete="CASCADE"), 
+        nullable=False, comment="会话ID"
+    )
+    
+    # 资源指标
+    cpu_percent: Mapped[Optional[float]] = mapped_column(
+        Numeric(5, 2), comment="CPU使用率(%)"
+    )
+    memory_mb: Mapped[Optional[int]] = mapped_column(
+        Integer, comment="内存使用量(MB)"
+    )
+    gpu_percent: Mapped[Optional[float]] = mapped_column(
+        Numeric(5, 2), comment="GPU使用率(%)"
+    )
+    gpu_memory_mb: Mapped[Optional[int]] = mapped_column(
+        Integer, comment="GPU内存使用量(MB)"
+    )
+    disk_io_mb: Mapped[Optional[float]] = mapped_column(
+        Numeric(10, 2), comment="磁盘IO(MB)"
+    )
+    network_io_mb: Mapped[Optional[float]] = mapped_column(
+        Numeric(10, 2), comment="网络IO(MB)"
+    )
+    
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        nullable=False,
+        comment="记录时间"
+    )
+    
+    # 关系映射
+    session: Mapped["StrategySession"] = relationship(
+        "StrategySession", back_populates="resource_usage"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<ResourceUsage(id={self.id}, session_id={self.session_id}, cpu={self.cpu_percent}%)>"
+
+
+class WebSocketConnection(Base, TimestampMixin):
+    """WebSocket连接管理模型
+    
+    管理WebSocket连接状态和会话订阅。
+    支持实时数据推送和连接监控。
+    """
+    __tablename__ = "websocket_connections"
+    __table_args__ = (
+        Index("idx_websocket_connections_user", "user_id"),
+        Index("idx_websocket_connections_active", "is_active"),
+        Index("idx_websocket_connections_id", "connection_id"),
+        {"comment": "WebSocket连接表"}
+    )
+    
+    # 主键
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="记录ID")
+    
+    # 用户关联
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), 
+        nullable=False, comment="用户ID"
+    )
+    connection_id: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, comment="连接ID"
+    )
+    session_ids: Mapped[List[int]] = mapped_column(
+        CompatibleARRAY(Integer), default=list, nullable=False, comment="订阅的会话ID列表"
+    )
+    
+    # 连接信息
+    ip_address: Mapped[Optional[str]] = mapped_column(
+        CompatibleINET, comment="IP地址"
+    )
+    user_agent: Mapped[Optional[str]] = mapped_column(
+        Text, comment="用户代理"
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, comment="是否活跃"
+    )
+    
+    # 时间信息
+    connected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        nullable=False,
+        comment="连接时间"
+    )
+    last_activity: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now(),
+        nullable=False,
+        comment="最后活动时间"
+    )
+    
+    # 关系映射
+    user: Mapped["User"] = relationship(
+        "User", back_populates="websocket_connections"
+    )
+    
+    def __repr__(self) -> str:
+        return f"<WebSocketConnection(id={self.id}, user_id={self.user_id}, active={self.is_active})>"
+
+
 class CeleryTask(Base, TimestampMixin):
     """Celery任务记录模型
     
@@ -1009,7 +1312,7 @@ __all__ = [
     # 枚举
     "UserRole", "StrategyType", "StrategyStatus", "DatasetStatus",
     "TrainingStatus", "EvaluationType", "EvaluationStatus", 
-    "LogLevel", "TaskStatus",
+    "LogLevel", "TaskStatus", "SessionType", "SessionStatus",
     
     # Mixin类
     "TimestampMixin", "UUIDMixin",
@@ -1017,5 +1320,6 @@ __all__ = [
     # 模型类
     "User", "UserSession", "Strategy", "StrategyVersion",
     "Dataset", "TrainingJob", "TrainingMetric", "Evaluation",
-    "SystemLog", "CeleryTask"
+    "SystemLog", "CeleryTask", "StrategySession", "PerformanceMetric", 
+    "ResourceUsage", "WebSocketConnection"
 ]
