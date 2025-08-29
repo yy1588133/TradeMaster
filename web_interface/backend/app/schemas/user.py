@@ -81,10 +81,8 @@ class UserCreate(UserBase):
         if not re.search(r'\d', v):
             raise ValueError('密码必须包含数字')
         
-        # 检查特殊字符（可选）
-        special_chars = r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]'
-        if not re.search(special_chars, v):
-            raise ValueError('密码建议包含特殊字符以提高安全性')
+        # 注意：特殊字符为可选，不再强制要求
+        # 用户可以选择包含或不包含特殊字符
         
         return v
     
@@ -139,9 +137,8 @@ class UserPasswordUpdate(BaseSchema):
         if not re.search(r'\d', v):
             raise ValueError('密码必须包含数字')
         
-        special_chars = r'[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]'
-        if not re.search(special_chars, v):
-            raise ValueError('密码建议包含特殊字符以提高安全性')
+        # 注意：特殊字符为可选，不再强制要求
+        # 用户可以选择包含或不包含特殊字符
         
         return v
     
@@ -299,6 +296,9 @@ class PasswordResetConfirm(BaseSchema):
             raise ValueError('密码必须包含字母')
         if not re.search(r'\d', v):
             raise ValueError('密码必须包含数字')
+        
+        # 注意：特殊字符为可选，不再强制要求
+        # 用户可以选择包含或不包含特殊字符
         
         return v
     

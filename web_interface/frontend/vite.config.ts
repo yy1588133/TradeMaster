@@ -1,7 +1,8 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import { resolve } from 'path'
-import { visualizer } from 'rollup-plugin-visualizer'
+// 在Docker环境中暂时禁用rollup-plugin-visualizer避免平台兼容性问题
+// import { visualizer } from 'rollup-plugin-visualizer'
 import legacy from '@vitejs/plugin-legacy'
 import checker from 'vite-plugin-checker'
 import eslint from 'vite-plugin-eslint'
@@ -44,15 +45,15 @@ export default defineConfig(({ mode, command }) => {
           targets: ['defaults', 'not IE 11'],
         }),
       
-      // Bundle分析器
-      isProduction &&
-        visualizer({
-          filename: 'dist/stats.html',
-          open: false,
-          gzipSize: true,
-          brotliSize: true,
-          template: 'treemap', // sunburst, treemap, network
-        }),
+      // Bundle分析器 - 在Docker环境中暂时禁用避免rollup平台问题
+      // isProduction &&
+      //   visualizer({
+      //     filename: 'dist/stats.html',
+      //     open: false,
+      //     gzipSize: true,
+      //     brotliSize: true,
+      //     template: 'treemap', // sunburst, treemap, network
+      //   }),
     ].filter(Boolean),
 
     resolve: {

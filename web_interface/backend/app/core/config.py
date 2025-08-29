@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     
     # 密码策略
     MIN_PASSWORD_LENGTH: int = Field(default=8, description="最小密码长度")
-    REQUIRE_SPECIAL_CHARS: bool = Field(default=True, description="密码是否需要特殊字符")
+    REQUIRE_SPECIAL_CHARS: bool = Field(default=False, description="密码是否需要特殊字符")
     
     # ==================== 数据库配置 ====================
     POSTGRES_SERVER: str = Field(default="localhost", description="PostgreSQL服务器地址", alias="DB_HOST")

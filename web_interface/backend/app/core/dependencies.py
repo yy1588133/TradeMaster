@@ -33,16 +33,27 @@ from app.core.security import (
 @lru_cache()
 def get_async_engine():
     """获取异步数据库引擎（单例）"""
-    return create_async_engine(
-        settings.get_database_url(async_driver=True),
-        pool_size=settings.DB_POOL_SIZE,
-        max_overflow=settings.DB_MAX_OVERFLOW,
-        pool_timeout=settings.DB_POOL_TIMEOUT,
-        pool_pre_ping=True,
-        echo=settings.DEBUG,  # 开发环境启用SQL日志
-        future=True,
-        poolclass=NullPool if settings.DEBUG else None,  # 开发环境不使用连接池
-    )
+    # 根据是否使用NullPool来决定参数
+    if settings.DEBUG:
+        # 开发环境使用NullPool，不支持连接池参数
+        return create_async_engine(
+            settings.get_database_url(async_driver=True),
+            pool_pre_ping=True,
+            echo=settings.DEBUG,
+            future=True,
+            poolclass=NullPool,
+        )
+    else:
+        # 生产环境使用标准连接池
+        return create_async_engine(
+            settings.get_database_url(async_driver=True),
+            pool_size=settings.DB_POOL_SIZE,
+            max_overflow=settings.DB_MAX_OVERFLOW,
+            pool_timeout=settings.DB_POOL_TIMEOUT,
+            pool_pre_ping=True,
+            echo=settings.DEBUG,
+            future=True,
+        )
 
 
 # 创建异步会话工厂

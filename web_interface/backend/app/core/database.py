@@ -199,8 +199,9 @@ async def check_database_connection() -> bool:
         bool: 连接是否正常
     """
     try:
-        async with get_db_session() as session:
-            await session.execute(text("SELECT 1"))
+        # 直接使用引擎连接，避免会话管理问题
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
             return True
     except Exception as e:
         logger.error(f"数据库连接检查失败: {e}")

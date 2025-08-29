@@ -7,7 +7,7 @@
 
 import time
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from fastapi.responses import JSONResponse
@@ -35,7 +35,7 @@ from app.core.security import (
     UserRole
 )
 from app.services.user_service import user_service
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, UserProfile
 
 
 router = APIRouter()
@@ -72,7 +72,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="用户名")
     email: EmailStr = Field(..., description="邮箱地址")
     password: str = Field(..., min_length=8, description="密码")
-    full_name: str = Field(None, max_length=100, description="全名")
+    full_name: Optional[str] = Field(None, max_length=100, description="全名")
     agree_terms: bool = Field(..., description="同意服务条款")
 
 
@@ -98,8 +98,6 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., description="刷新令牌")
 
 
-# ==================== 响应模型 ====================
-
 class TokenResponse(BaseModel):
     """令牌响应模型"""
     access_token: str = Field(..., description="访问令牌")
@@ -108,24 +106,9 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(..., description="过期时间（秒）")
 
 
-class UserResponseModel(BaseModel):
-    """用户响应模型"""
-    id: int = Field(..., description="用户ID")
-    uuid: str = Field(..., description="用户UUID")  
-    username: str = Field(..., description="用户名")
-    email: str = Field(..., description="邮箱")
-    full_name: str = Field(None, description="全名")
-    role: UserRole = Field(..., description="用户角色")
-    is_active: bool = Field(..., description="是否激活")
-    is_verified: bool = Field(..., description="是否已验证邮箱")
-    created_at: str = Field(..., description="创建时间")
-    last_login_at: str = Field(None, description="最后登录时间")
-    login_count: int = Field(..., description="登录次数")
-
-
 class LoginResponse(BaseModel):
     """登录响应模型"""
-    user: UserResponseModel = Field(..., description="用户信息")
+    user: UserResponse = Field(..., description="用户信息")
     tokens: TokenResponse = Field(..., description="令牌信息")
     message: str = Field(default="登录成功", description="响应消息")
 
@@ -146,19 +129,21 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def format_user_response(user) -> UserResponseModel:
+def format_user_response(user) -> UserResponse:
     """格式化用户响应数据"""
-    return UserResponseModel(
+    return UserResponse(
         id=user.id,
-        uuid=user.uuid,
+        uuid=str(user.uuid),
         username=user.username,
         email=user.email,
         full_name=user.full_name,
+        avatar_url=user.avatar_url,
         role=user.role,
         is_active=user.is_active,
         is_verified=user.is_verified,
-        created_at=user.created_at.isoformat() if user.created_at else None,
-        last_login_at=user.last_login_at.isoformat() if user.last_login_at else None,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        last_login_at=user.last_login_at,
         login_count=user.login_count or 0
     )
 
@@ -220,11 +205,11 @@ async def login(
         raise
 
 
-@router.post("/register", response_model=UserResponseModel, summary="用户注册")
+@router.post("/register", response_model=UserResponse, summary="用户注册")
 async def register(
     register_data: RegisterRequest,
     db: DatabaseSession
-) -> UserResponseModel:
+) -> UserResponse:
     """用户注册
     
     创建新用户账户，验证用户名和邮箱的唯一性。
@@ -303,11 +288,11 @@ async def logout(
         }
 
 
-@router.get("/me", response_model=UserResponseModel, summary="获取当前用户信息")
+@router.get("/me", response_model=UserResponse, summary="获取当前用户信息")
 async def get_current_user_info(
     current_user: CurrentUser,
     db: DatabaseSession
-) -> UserResponseModel:
+) -> UserResponse:
     """获取当前用户信息
     
     返回当前登录用户的详细信息。
@@ -320,12 +305,12 @@ async def get_current_user_info(
     return format_user_response(user)
 
 
-@router.put("/me", response_model=UserResponseModel, summary="更新用户信息")
+@router.put("/me", response_model=UserResponse, summary="更新用户信息")
 async def update_user_info(
     current_user: CurrentUser,
     db: DatabaseSession,
     user_update: Dict[str, Any] = Body(...)
-) -> UserResponseModel:
+) -> UserResponse:
     """更新用户信息
     
     允许用户更新自己的基本信息（用户名、邮箱、全名等）。
